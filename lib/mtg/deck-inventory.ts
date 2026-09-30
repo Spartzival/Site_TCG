@@ -1,13 +1,29 @@
 import type { CollectionCard, DeckProject, MtgCard } from "@/types/mtg";
+import { normalizeDeckFormat } from "@/lib/mtg/deck-format";
 
 export function logicalCardId(card: Pick<MtgCard, "id" | "oracleId">) {
   return card.oracleId ?? card.id;
 }
 
+function committedEntries(deck: DeckProject) {
+  const format = normalizeDeckFormat(deck.format);
+
+  if (format === "Standard") {
+    return deck.cards.filter(
+      (entry) => entry.section === "mainboard" || entry.section === "sideboard",
+    );
+  }
+
+  return [
+    ...deck.commanders,
+    ...deck.cards.filter((entry) => entry.section === "mainboard"),
+  ];
+}
+
 /**
- * Physical copies already committed to READY decks other than the deck being
- * viewed. Maybeboard/sideboard entries are intentionally ignored because they
- * are not part of the actual 100-card Commander deck.
+ * Physical copies already committed to READY decks other than the deck being viewed.
+ * Commander reserves command zone + mainboard. Standard reserves mainboard + sideboard.
+ * Maybeboard cards never reserve physical inventory.
  */
 export function buildReservedReadyCopies(
   decks: DeckProject[],
@@ -18,12 +34,7 @@ export function buildReservedReadyCopies(
   for (const deck of decks) {
     if (deck.status !== "active" || deck.id === currentDeckId) continue;
 
-    const entries = [
-      ...deck.commanders,
-      ...deck.cards.filter((entry) => entry.section === "mainboard"),
-    ];
-
-    for (const entry of entries) {
+    for (const entry of committedEntries(deck)) {
       const id = logicalCardId(entry.card);
       reserved.set(id, (reserved.get(id) ?? 0) + entry.quantity);
     }
@@ -54,12 +65,7 @@ export function countPhysicalMissingCopies(
 ) {
   const needed = new Map<string, number>();
 
-  const entries = [
-    ...deck.commanders,
-    ...deck.cards.filter((entry) => entry.section === "mainboard"),
-  ];
-
-  for (const entry of entries) {
+  for (const entry of committedEntries(deck)) {
     const id = logicalCardId(entry.card);
     needed.set(id, (needed.get(id) ?? 0) + entry.quantity);
   }

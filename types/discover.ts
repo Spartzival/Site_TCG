@@ -1,4 +1,4 @@
-import type { DeckStatus, MtgCard } from "@/types/mtg";
+import type { DeckFormat, DeckStatus, MtgCard } from "@/types/mtg";
 
 export type DiscoverRoleNeed = {
   role: string;
@@ -10,12 +10,14 @@ export type DiscoverRoleNeed = {
 export type DiscoverDeckInput = {
   id: string;
   name: string;
+  format: DeckFormat;
   status: DeckStatus;
   updatedAt: string;
-  commander: Pick<
+  commander?: Pick<
     MtgCard,
     "name" | "oracleText" | "typeLine" | "colorIdentity" | "keywords" | "faces"
   >;
+  colorIdentity: string[];
   cardNames: string[];
   roleNeeds: DiscoverRoleNeed[];
 };

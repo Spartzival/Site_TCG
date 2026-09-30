@@ -2,16 +2,16 @@
 
 import { useState } from "react";
 import { parseDeckText } from "@/lib/mtg/deck-parser";
-import type { DeckCardEntry } from "@/types/mtg";
+import type { DeckCardEntry, DeckFormat } from "@/types/mtg";
 import { resolveCardCollection } from "@/lib/mtg/api-client";
 import { indexCardsByNameAliases, normalizeCardLookupName } from "@/lib/mtg/card-identity";
 
 type Props = {
+  format: DeckFormat;
   onImport: (entries: DeckCardEntry[], commanders: DeckCardEntry[]) => void;
 };
 
-
-export default function DeckImportPanel({ onImport }: Props) {
+export default function DeckImportPanel({ format, onImport }: Props) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
@@ -30,12 +30,6 @@ export default function DeckImportPanel({ onImport }: Props) {
     try {
       const names = Array.from(new Set(parsed.entries.map((entry) => entry.name)));
       const payload = await resolveCardCollection(names.map((name) => ({ name })));
-
-      /*
-       * A multi-faced card can be exported with its complete Scryfall name
-       * ("Front // Back") or with only one face name. Every alias points to
-       * the SAME physical MtgCard object.
-       */
       const byName = indexCardsByNameAliases(payload.cards ?? []);
 
       const entries: DeckCardEntry[] = [];
@@ -44,11 +38,18 @@ export default function DeckImportPanel({ onImport }: Props) {
       for (const parsedEntry of parsed.entries) {
         const card = byName.get(normalizeCardLookupName(parsedEntry.name))?.[0];
         if (!card) continue;
+
+        if (format === "Standard" && parsedEntry.section === "commander") {
+          entries.push({ card, quantity: parsedEntry.quantity, section: "mainboard" });
+          continue;
+        }
+
         const entry: DeckCardEntry = {
           card,
           quantity: parsedEntry.quantity,
           section: parsedEntry.section,
         };
+
         if (parsedEntry.section === "commander") commanders.push(entry);
         else entries.push(entry);
       }
@@ -88,7 +89,11 @@ export default function DeckImportPanel({ onImport }: Props) {
             <span>Decklist texte</span>
             <textarea
               value={text}
-              placeholder={`// Commander\n1 Kona, Rescue Beastie\n\n// Main\n1 Sol Ring\n1 Llanowar Elves\n...`}
+              placeholder={
+                format === "Commander"
+                  ? `// Commander\n1 Kona, Rescue Beastie\n\n// Main\n1 Sol Ring\n1 Llanowar Elves\n...`
+                  : `// Main\n4 Llanowar Elves\n4 Lightning Strike\n24 Forest\n...\n\n// Sideboard\n2 Duress\n...`
+              }
               onChange={(event) => setText(event.target.value)}
             />
           </label>

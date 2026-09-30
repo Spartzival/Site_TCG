@@ -6,7 +6,8 @@ import { loadCollection } from "@/lib/mtg/collection-storage";
 import { loadDeckProjects } from "@/lib/mtg/deck-storage";
 import { detectCardRoles, type CardRole } from "@/lib/mtg/card-role-analyzer";
 import { logicalCardId } from "@/lib/mtg/deck-inventory";
-import type { CollectionCard, DeckProject, MtgCard } from "@/types/mtg";
+import { normalizeDeckFormat } from "@/lib/mtg/deck-format";
+import type { CollectionCard, DeckFormat, DeckProject, MtgCard } from "@/types/mtg";
 import type {
   DiscoverDeckInput,
   DiscoverPersonalCard,
@@ -20,13 +21,23 @@ type RoleTarget = {
   target: number;
 };
 
-const ROLE_TARGETS: RoleTarget[] = [
+const COMMANDER_ROLE_TARGETS: RoleTarget[] = [
   { role: "ramp", label: "Ramp", target: 8 },
   { role: "draw", label: "Pioche", target: 8 },
   { role: "removal", label: "Removal", target: 6 },
   { role: "board-wipe", label: "Wrath / Board wipe", target: 2 },
   { role: "protection", label: "Protection", target: 3 },
   { role: "recursion", label: "Récursion", target: 2 },
+  { role: "finisher", label: "Finisher", target: 2 },
+];
+
+const STANDARD_ROLE_TARGETS: RoleTarget[] = [
+  { role: "ramp", label: "Ramp", target: 4 },
+  { role: "draw", label: "Pioche", target: 6 },
+  { role: "removal", label: "Removal", target: 6 },
+  { role: "board-wipe", label: "Wrath / Board wipe", target: 2 },
+  { role: "protection", label: "Protection", target: 2 },
+  { role: "recursion", label: "Récursion", target: 1 },
   { role: "finisher", label: "Finisher", target: 2 },
 ];
 
@@ -40,8 +51,10 @@ type PreviewCard = {
 };
 
 function buildDiscoverDeck(deck: DeckProject): DiscoverDeckInput | null {
+  const format = normalizeDeckFormat(deck.format);
   const commander = deck.commanders[0]?.card;
-  if (!commander) return null;
+
+  if (format === "Commander" && !commander) return null;
 
   const counts = new Map<CardRole, number>();
   for (const entry of deck.cards) {
@@ -51,24 +64,43 @@ function buildDiscoverDeck(deck: DeckProject): DiscoverDeckInput | null {
     }
   }
 
+  const colorIdentity =
+    format === "Commander" && commander
+      ? commander.colorIdentity
+      : Array.from(
+          new Set(
+            deck.cards
+              .filter((entry) => entry.section === "mainboard")
+              .flatMap((entry) => entry.card.colorIdentity),
+          ),
+        );
+
   return {
     id: deck.id,
     name: deck.name,
+    format,
     status: deck.status,
     updatedAt: deck.updatedAt,
-    commander: {
-      name: commander.name,
-      oracleText: commander.oracleText,
-      typeLine: commander.typeLine,
-      colorIdentity: commander.colorIdentity,
-      keywords: commander.keywords,
-      faces: commander.faces,
-    },
-    cardNames: deck.cards.map((entry) => entry.card.name),
-    roleNeeds: ROLE_TARGETS.map((target) => ({
-      ...target,
-      count: counts.get(target.role) ?? 0,
-    })),
+    commander: commander
+      ? {
+          name: commander.name,
+          oracleText: commander.oracleText,
+          typeLine: commander.typeLine,
+          colorIdentity: commander.colorIdentity,
+          keywords: commander.keywords,
+          faces: commander.faces,
+        }
+      : undefined,
+    colorIdentity,
+    cardNames: deck.cards
+      .filter((entry) => entry.section === "mainboard")
+      .map((entry) => entry.card.name),
+    roleNeeds: (format === "Commander" ? COMMANDER_ROLE_TARGETS : STANDARD_ROLE_TARGETS).map(
+      (target) => ({
+        ...target,
+        count: counts.get(target.role) ?? 0,
+      }),
+    ),
   };
 }
 
@@ -295,7 +327,7 @@ function PersonalCard({
   );
 }
 
-export default function DiscoverTab() {
+export default function DiscoverTab({ format }: { format: DeckFormat }) {
   const [collection, setCollection] = useState<CollectionCard[]>([]);
   const [decks, setDecks] = useState<DeckProject[]>([]);
   const [analysis, setAnalysis] = useState<DiscoverResponse | null>(null);
@@ -304,7 +336,11 @@ export default function DiscoverTab() {
 
   useEffect(() => {
     const currentCollection = loadCollection();
-    const currentDecks = loadDeckProjects().filter((deck) => deck.status !== "archived");
+    const currentDecks = loadDeckProjects().filter(
+      (deck) =>
+        deck.status !== "archived" &&
+        normalizeDeckFormat(deck.format) === format,
+    );
     setCollection(currentCollection);
     setDecks(currentDecks);
 
@@ -320,7 +356,7 @@ export default function DiscoverTab() {
         const payload = await fetchJson<DiscoverResponse>("/api/mtg/discover", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ decks: deckInputs }),
+          body: JSON.stringify({ format, decks: deckInputs }),
           signal: controller.signal,
         });
         setAnalysis(payload);
@@ -340,12 +376,17 @@ export default function DiscoverTab() {
 
     void run();
     return () => controller.abort();
-  }, []);
+  }, [format]);
 
   const deckSummary = useMemo(() => {
-    const withCommander = decks.filter((deck) => deck.commanders.length > 0).length;
-    return { total: decks.length, withCommander };
-  }, [decks]);
+    const analyzable = decks.filter((deck) =>
+      format === "Commander"
+        ? deck.commanders.length > 0
+        : deck.cards.some((entry) => entry.section === "mainboard"),
+    ).length;
+
+    return { total: decks.length, analyzable };
+  }, [decks, format]);
 
   return (
     <div className="mtg-tab-page mtg-discover-page">
@@ -354,14 +395,16 @@ export default function DiscoverTab() {
           <span className="mtg-tab-page__eyebrow">DÉCOUVRIR</span>
           <h2>Tendances & recommandations</h2>
           <p>
-            Les sorties Commander qui montent, puis des idées calculées à partir de tes propres decks.
+            {format === "Commander"
+              ? "Les sorties Commander qui montent, puis des idées calculées à partir de tes propres decks."
+              : "Les sorties récentes légales en Standard, puis des idées calculées à partir de tes propres decklists."}
           </p>
         </div>
 
         <div className="mtg-discover-header__stats">
           <div>
             <span>Decks analysés</span>
-            <strong>{deckSummary.withCommander}</strong>
+            <strong>{deckSummary.analyzable}</strong>
           </div>
           <div>
             <span>Cartes possédées</span>
@@ -381,12 +424,20 @@ export default function DiscoverTab() {
         <div className="mtg-discover-section__heading">
           <div>
             <span>01 · TENDANCES RÉCENTES</span>
-            <h3>Les nouvelles cartes qui s’installent en Commander</h3>
+            <h3>
+              {format === "Commander"
+                ? "Les nouvelles cartes qui s’installent en Commander"
+                : "Les sorties récentes légales en Standard"}
+            </h3>
           </div>
           <p>
             {analysis?.recentSince
-              ? `Sorties depuis le ${formatSince(analysis.recentSince)}, classées par popularité Commander.`
-              : "Cartes sorties sur les six derniers mois, classées par popularité Commander."}
+              ? format === "Commander"
+                ? `Sorties depuis le ${formatSince(analysis.recentSince)}, classées par popularité Commander.`
+                : `Cartes légales en Standard sorties depuis le ${formatSince(analysis.recentSince)}.`
+              : format === "Commander"
+                ? "Cartes sorties sur les six derniers mois, classées par popularité Commander."
+                : "Cartes légales en Standard sorties sur les six derniers mois."}
           </p>
         </div>
 
@@ -403,7 +454,10 @@ export default function DiscoverTab() {
                   setPreview({
                     card: item.card,
                     title: "TENDANCE RÉCENTE",
-                    subtitle: "Carte populaire en Commander",
+                    subtitle:
+                      format === "Commander"
+                        ? "Carte populaire en Commander"
+                        : "Sortie récente légale en Standard",
                     popularityRank: item.popularityRank,
                   })
                 }
@@ -420,14 +474,20 @@ export default function DiscoverTab() {
             <h3>Des cartes cohérentes avec ta façon de construire</h3>
           </div>
           <p>
-            Les suggestions croisent tes commandants, leurs identités couleur et les rôles encore faibles dans tes decklists.
+            {format === "Commander"
+              ? "Les suggestions croisent tes commandants, leurs identités couleur et les rôles encore faibles dans tes decklists."
+              : "Les suggestions croisent les couleurs réellement jouées et les rôles encore faibles dans tes decklists Standard."}
           </p>
         </div>
 
         {!loading && (analysis?.personalized.length ?? 0) === 0 ? (
           <div className="mtg-discover-empty">
             <strong>Pas encore assez de contexte</strong>
-            <p>Ajoute au moins un commandant à un deck pour obtenir des recommandations personnalisées.</p>
+            <p>
+              {format === "Commander"
+                ? "Ajoute au moins un commandant à un deck pour obtenir des recommandations personnalisées."
+                : "Ajoute quelques cartes à un deck Standard pour obtenir des recommandations personnalisées."}
+            </p>
           </div>
         ) : (
           <div className="mtg-discover-personal-grid">
@@ -455,9 +515,11 @@ export default function DiscoverTab() {
       <footer className="mtg-discover-method">
         <span>MÉTHODE</span>
         <p>
-          Les tendances utilisent le classement de popularité Commander fourni par Scryfall. Les recommandations personnelles
-          restent locales à ta bibliothèque : le serveur reçoit uniquement les informations de deck nécessaires au calcul et ne
-          modifie aucune carte ni aucun deck.
+          {format === "Commander"
+            ? "Les tendances utilisent le classement de popularité Commander fourni par Scryfall. "
+            : "Les tendances Standard utilisent les sorties récentes actuellement légales dans le format. "}
+          Les recommandations personnelles restent locales à ta bibliothèque : le serveur reçoit uniquement les informations de
+          deck nécessaires au calcul et ne modifie aucune carte ni aucun deck.
         </p>
       </footer>
 

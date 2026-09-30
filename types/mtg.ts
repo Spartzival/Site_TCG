@@ -1,4 +1,5 @@
 export type DeckStatus = "active" | "building" | "archived";
+export type DeckFormat = "Commander" | "Standard";
 
 export type CommanderBracket = 1 | 2 | 3 | 4 | 5;
 
@@ -86,7 +87,7 @@ export type MtgDeck = {
   id: string;
   name: string;
   slug: string;
-  format: string;
+  format: DeckFormat;
   bracket?: CommanderBracket;
   status: DeckStatus;
   description?: string;
@@ -128,6 +129,7 @@ export type DeckLocalAnalysis = {
   totalCards: number;
   commanderCount: number;
   mainboardCount: number;
+  sideboardCount: number;
   landCount: number;
   nonlandCount: number;
   averageManaValue: number;
@@ -137,6 +139,7 @@ export type DeckLocalAnalysis = {
   commanderIdentity: string[];
   colorIdentityViolations: string[];
   commanderLegalityViolations: string[];
+  legalityViolations: string[];
   duplicateViolations: string[];
 };
 

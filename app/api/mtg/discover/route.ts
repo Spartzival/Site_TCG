@@ -15,9 +15,10 @@ import type {
   DiscoverResponse,
   DiscoverTrendingCard,
 } from "@/types/discover";
-import type { MtgCard } from "@/types/mtg";
+import type { DeckFormat, MtgCard } from "@/types/mtg";
 
 type DiscoverRequest = {
+  format?: DeckFormat;
   decks?: DiscoverDeckInput[];
 };
 
@@ -127,6 +128,8 @@ function allOracleText(card: MtgCard): string {
 }
 
 function commanderText(deck: DiscoverDeckInput): string {
+  if (!deck.commander) return "";
+
   return [
     deck.commander.oracleText,
     ...(deck.commander.faces?.map((face) => face.oracleText) ?? []),
@@ -139,6 +142,8 @@ function commanderText(deck: DiscoverDeckInput): string {
 function commanderSynergy(
   deck: DiscoverDeckInput,
 ): { query: string; reason: string; kind: string } | null {
+  if (!deck.commander) return null;
+
   const text = commanderText(deck);
   const type = (deck.commander.typeLine ?? "").toLocaleLowerCase("en");
 
@@ -267,12 +272,16 @@ function cardMatchesSynergy(card: MtgCard, kind: string): boolean {
   }
 }
 
-async function searchScryfall(query: string, limit: number): Promise<SearchResult[]> {
+async function searchScryfall(
+  query: string,
+  limit: number,
+  order: "edhrec" | "released" = "edhrec",
+): Promise<SearchResult[]> {
   const endpoint = new URL("https://api.scryfall.com/cards/search");
   endpoint.searchParams.set("q", query);
   endpoint.searchParams.set("unique", "cards");
-  endpoint.searchParams.set("order", "edhrec");
-  endpoint.searchParams.set("dir", "asc");
+  endpoint.searchParams.set("order", order);
+  endpoint.searchParams.set("dir", order === "released" ? "desc" : "asc");
 
   return scheduleScryfall(async () => {
     const response: Response = await fetch(endpoint, {
@@ -314,18 +323,21 @@ export async function POST(request: Request) {
     // Les tendances restent disponibles sans personnalisation.
   }
 
+  const format: DeckFormat = body.format === "Standard" ? "Standard" : "Commander";
+
   let trendError: string | undefined;
   let trending: DiscoverTrendingCard[] = [];
 
   try {
     const trendingRaw = await searchScryfall(
-      `legal:commander game:paper -is:funny -is:reprint -t:basic date>=${recentSince}`,
+      `${format === "Commander" ? "legal:commander" : "legal:standard"} game:paper -is:funny -is:reprint -t:basic date>=${recentSince}`,
       18,
+      format === "Commander" ? "edhrec" : "released",
     );
 
     trending = trendingRaw.map((item) => ({
       card: item.card,
-      popularityRank: item.popularityRank,
+      popularityRank: format === "Commander" ? item.popularityRank : undefined,
     }));
   } catch (error) {
     trendError =
@@ -335,7 +347,12 @@ export async function POST(request: Request) {
   }
 
   const decks = [...(body.decks ?? [])]
-    .filter((deck) => Boolean(deck.commander?.name))
+    .filter((deck) => deck.format === format)
+    .filter((deck) =>
+      format === "Commander"
+        ? Boolean(deck.commander?.name)
+        : deck.cardNames.length > 0,
+    )
     .sort((a, b) => {
       if (a.status !== b.status) return a.status === "active" ? -1 : 1;
       return b.updatedAt.localeCompare(a.updatedAt);
@@ -350,18 +367,23 @@ export async function POST(request: Request) {
   for (const deck of decks) {
     try {
       const inDeck = new Set(
-        [deck.commander.name, ...deck.cardNames].map(normalizeName),
+        [deck.commander?.name, ...deck.cardNames]
+          .filter((name): name is string => Boolean(name))
+          .map(normalizeName),
       );
 
-      const base = `legal:commander game:paper -is:funny -t:basic ${identityQuery(
-        deck.commander.colorIdentity ?? [],
-      )}`;
+      const identity =
+        format === "Commander"
+          ? deck.commander?.colorIdentity ?? deck.colorIdentity
+          : deck.colorIdentity;
+      const identityFilter = identity.length > 0 ? identityQuery(identity) : "";
+      const base = `${format === "Commander" ? "legal:commander" : "legal:standard"} game:paper -is:funny -t:basic ${identityFilter}`.trim();
 
       const gap = [...deck.roleNeeds]
         .filter((need) => need.count < need.target && ROLE_QUERIES[need.role])
-        .sort((a, b) => b.target - b.count - (a.target - a.count))[0];
+        .sort((a, b) => (b.target - b.count) - (a.target - a.count))[0];
 
-      const synergy = commanderSynergy(deck);
+      const synergy = format === "Commander" ? commanderSynergy(deck) : null;
       const clauses = [synergy?.query, gap ? ROLE_QUERIES[gap.role] : null].filter(
         (value): value is string => Boolean(value),
       );
@@ -397,7 +419,11 @@ export async function POST(request: Request) {
         }
 
         if (reasons.size === 0) {
-          reasons.add(`Carte Commander populaire compatible avec ${deck.commander.name}.`);
+          reasons.add(
+            format === "Commander" && deck.commander
+              ? `Carte Commander populaire compatible avec ${deck.commander.name}.`
+              : `Carte légale en Standard compatible avec les couleurs de ${deck.name}.`,
+          );
           bonus += 18;
         }
 
@@ -408,14 +434,16 @@ export async function POST(request: Request) {
           reasons: new Set<string>(),
           deckIds: new Set<string>(),
           deckNames: new Set<string>(),
-          popularityRank: result.popularityRank,
+          popularityRank: format === "Commander" ? result.popularityRank : undefined,
         };
 
         existing.score += bonus + Math.max(0, 34 - index);
         reasons.forEach((reason) => existing.reasons.add(reason));
         existing.deckIds.add(deck.id);
         existing.deckNames.add(deck.name);
-        existing.popularityRank = existing.popularityRank ?? result.popularityRank;
+        if (format === "Commander") {
+          existing.popularityRank = existing.popularityRank ?? result.popularityRank;
+        }
 
         candidates.set(key, existing);
       });

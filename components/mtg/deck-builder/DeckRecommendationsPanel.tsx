@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type {
   CollectionCard,
   DeckCardSuggestion,
+  DeckFormat,
   DeckRecommendations,
   MtgCard,
 } from "@/types/mtg";
@@ -11,6 +12,7 @@ import { logicalCardId } from "@/lib/mtg/deck-inventory";
 
 type Props = {
   analysis: DeckRecommendations | null;
+  format: DeckFormat;
   loading: boolean;
   collection: CollectionCard[];
   readOnly?: boolean;
@@ -275,6 +277,7 @@ function SuggestionCard({
 
 export default function DeckRecommendationsPanel({
   analysis,
+  format,
   loading,
   collection,
   readOnly = false,
@@ -292,8 +295,10 @@ export default function DeckRecommendationsPanel({
         </div>
 
         <p className="mtg-recommendations-panel__intro">
-          Recommandations calculées à partir du commandant, de son texte Oracle, des rôles faibles de la decklist
-          et de la popularité Commander des cartes. Clique sur l’image ou le nom d’une suggestion pour l’afficher en grand.
+          {format === "Commander"
+            ? "Recommandations calculées à partir du commandant, de son texte Oracle, des rôles faibles de la decklist et de la popularité Commander des cartes."
+            : "Recommandations limitées aux cartes légales en Standard, calculées à partir des couleurs actuelles et des rôles faibles de la decklist."} {" "}
+          Clique sur l’image ou le nom d’une suggestion pour l’afficher en grand.
         </p>
 
         {analysis?.available === false && (
@@ -304,7 +309,9 @@ export default function DeckRecommendationsPanel({
 
         {!loading && suggestions.length === 0 ? (
           <div className="mtg-combo-panel__empty">
-            Aucune suggestion calculée pour le moment. Choisis un commandant ou complète un peu la decklist.
+            {format === "Commander"
+              ? "Aucune suggestion calculée pour le moment. Choisis un commandant ou complète un peu la decklist."
+              : "Aucune suggestion calculée pour le moment. Ajoute quelques cartes au deck Standard pour définir ses couleurs et ses besoins."}
           </div>
         ) : (
           <div className="mtg-recommendations-panel__list">

@@ -5645,3 +5645,88 @@ a {
     grid-template-columns: 1fr;
   }
 }
+
+/* =========================================================
+   MTG FORMAT SWITCH · COMMANDER / STANDARD
+========================================================= */
+
+.mtg-format-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px;
+  margin-top: 10px;
+  padding: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.mtg-format-switch button {
+  min-height: 34px;
+  padding: 7px 12px;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 180ms ease, color 180ms ease, box-shadow 180ms ease;
+}
+
+.mtg-format-switch button:hover {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.mtg-format-switch button.is-active {
+  color: #ead1a7;
+  background: rgba(201, 152, 85, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(201, 152, 85, 0.24);
+}
+
+.mtg-dashboard__edition small {
+  margin-top: 9px;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.mtg-format-create-note {
+  display: grid;
+  gap: 6px;
+  padding: 16px 18px;
+  border: 1px solid rgba(201, 152, 85, 0.18);
+  background: rgba(201, 152, 85, 0.045);
+}
+
+.mtg-format-create-note strong {
+  color: #d6a661;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+}
+
+.mtg-format-create-note span {
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+@media (min-width: 1050px) {
+  .mtg-dashboard__tabs {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+@media (max-width: 800px) {
+  .mtg-dashboard__edition {
+    width: 100%;
+    min-width: 0;
+    padding-left: 0;
+    padding-top: 16px;
+    border-left: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .mtg-format-switch {
+    width: min(100%, 360px);
+  }
+}

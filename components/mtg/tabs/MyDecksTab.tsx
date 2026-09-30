@@ -3,10 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import DeckBuilder from "../deck-builder/DeckBuilder";
 import { analyzeDeckLocally } from "@/lib/mtg/deck-analyzer";
+import { normalizeDeckFormat } from "@/lib/mtg/deck-format";
 import { loadDeckProjects, saveDeckProjects } from "@/lib/mtg/deck-storage";
-import type { DeckProject } from "@/types/mtg";
+import type { DeckFormat, DeckProject } from "@/types/mtg";
 
-export default function MyDecksTab() {
+type Props = { format: DeckFormat };
+
+export default function MyDecksTab({ format }: Props) {
   const [decks, setDecks] = useState<DeckProject[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -20,9 +23,16 @@ export default function MyDecksTab() {
     if (hydrated) saveDeckProjects(decks);
   }, [decks, hydrated]);
 
+  useEffect(() => {
+    setSelectedId(null);
+  }, [format]);
+
   const activeDecks = useMemo(
-    () => decks.filter((deck) => deck.status === "active"),
-    [decks],
+    () =>
+      decks.filter(
+        (deck) => deck.status === "active" && normalizeDeckFormat(deck.format) === format,
+      ),
+    [decks, format],
   );
 
   const selected = decks.find((deck) => deck.id === selectedId) ?? null;
@@ -56,9 +66,9 @@ export default function MyDecksTab() {
     <div className="mtg-tab-page">
       <div className="mtg-tab-page__header">
         <div>
-          <span className="mtg-tab-page__eyebrow">DECK LIBRARY</span>
+          <span className="mtg-tab-page__eyebrow">{format.toUpperCase()} · DECK LIBRARY</span>
           <h2>Mes decks</h2>
-          <p>Decks validés, prêts à jouer et consultables en détail.</p>
+          <p>Decks {format} validés, prêts à jouer et consultables en détail.</p>
         </div>
       </div>
 
@@ -68,10 +78,10 @@ export default function MyDecksTab() {
         <div className="mtg-empty-state">
           <span className="mtg-empty-state__number">01</span>
           <div>
-            <strong>Aucun deck prêt pour le moment</strong>
+            <strong>Aucun deck {format} prêt pour le moment</strong>
             <p>
-              Termine un deck dans « Decks en construction ». Lorsqu'il respecte les validations
-              Commander, tu pourras le marquer comme prêt et il apparaîtra automatiquement ici.
+              Termine un deck dans « Decks en construction ». Lorsqu&apos;il respecte les validations {format},
+              tu pourras le marquer comme prêt et il apparaîtra automatiquement ici.
             </p>
           </div>
         </div>
@@ -79,6 +89,7 @@ export default function MyDecksTab() {
         <div className="mtg-deck-project-grid">
           {activeDecks.map((deck) => {
             const commander = deck.commanders[0]?.card;
+            const featured = commander ?? deck.cards.find((entry) => entry.section === "mainboard")?.card;
             const analysis = analyzeDeckLocally(deck);
             const identity = analysis.commanderIdentity.length
               ? analysis.commanderIdentity.join("")
@@ -92,17 +103,27 @@ export default function MyDecksTab() {
                 onClick={() => setSelectedId(deck.id)}
               >
                 <span className="mtg-deck-project-card__image">
-                  {commander?.imageUri ? <img src={commander.imageUri} alt="" /> : "CMD"}
+                  {featured?.imageUri ? <img src={featured.imageUri} alt="" /> : format === "Commander" ? "CMD" : "STD"}
                 </span>
 
                 <span className="mtg-deck-project-card__content">
-                  <small>COMMANDER · {analysis.totalCards}/100 · {identity}</small>
+                  <small>
+                    {format === "Commander"
+                      ? `COMMANDER · ${analysis.totalCards}/100 · ${identity}`
+                      : `STANDARD · ${analysis.mainboardCount} MAIN · ${analysis.sideboardCount} SIDE`}
+                  </small>
                   <strong>{deck.name}</strong>
-                  <span>{commander?.name ?? "Sans commandant"}</span>
+                  <span>{format === "Commander" ? commander?.name ?? "Sans commandant" : "Deck Standard"}</span>
 
                   <span className="mtg-ready-deck-card__meta">
                     <b>PRÊT</b>
-                    <i>{deck.bracket ? `Bracket ${deck.bracket}` : "Bracket en analyse"}</i>
+                    <i>
+                      {format === "Commander"
+                        ? deck.bracket
+                          ? `Bracket ${deck.bracket}`
+                          : "Bracket en analyse"
+                        : "Standard"}
+                    </i>
                   </span>
 
                   <em>Voir le deck et ses cartes →</em>

@@ -1,4 +1,5 @@
 import type { DeckCardEntry, DeckProject } from "@/types/mtg";
+import { normalizeDeckFormat } from "@/lib/mtg/deck-format";
 
 type ExportSection = {
   title: string;
@@ -15,17 +16,12 @@ function sortByName(entries: DeckCardEntry[]) {
   );
 }
 
-/**
- * Builds a portable decklist using only quantities and canonical card names.
- * Printing/set information is intentionally omitted so the text can be pasted
- * into deckbuilders such as Archidekt, Moxfield or MTGGoldfish.
- */
 export function exportDeckNames(deck: DeckProject) {
+  const format = normalizeDeckFormat(deck.format);
   const sections: ExportSection[] = [
-    {
-      title: "COMMANDANT",
-      entries: deck.commanders,
-    },
+    ...(format === "Commander"
+      ? [{ title: "COMMANDANT", entries: deck.commanders }]
+      : []),
     {
       title: "DECK",
       entries: deck.cards.filter((entry) => entry.section === "mainboard"),
@@ -55,7 +51,6 @@ export async function copyTextToClipboard(text: string) {
     return;
   }
 
-  // Fallback for browsers/contexts where the Clipboard API is unavailable.
   const textarea = document.createElement("textarea");
   textarea.value = text;
   textarea.setAttribute("readonly", "");

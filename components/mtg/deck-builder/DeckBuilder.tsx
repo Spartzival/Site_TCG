@@ -29,6 +29,7 @@ import {
 } from "@/lib/mtg/card-role-analyzer";
 import { getNamedCard } from "@/lib/mtg/api-client";
 import { primaryCardTypeLine } from "@/lib/mtg/card-identity";
+import { normalizeDeckFormat } from "@/lib/mtg/deck-format";
 import { copyTextToClipboard, exportDeckNames } from "@/lib/mtg/deck-export";
 import type {
   CollectionCard,
@@ -53,7 +54,7 @@ type Props = {
 type DeckDimension = "type" | "color" | "section" | "role";
 type DeckSort = "name" | "quantity" | "mana";
 type DeckDisplayMode = "image" | "image-name" | "name";
-type AnalysisDrawer = "stats" | "bracket" | "combos" | "recommendations";
+type AnalysisDrawer = "stats" | "bracket" | "legality" | "combos" | "recommendations";
 
 type RecommendationRoleTarget = {
   role: CardRole;
@@ -61,13 +62,23 @@ type RecommendationRoleTarget = {
   target: number;
 };
 
-const RECOMMENDATION_ROLE_TARGETS: RecommendationRoleTarget[] = [
+const COMMANDER_RECOMMENDATION_ROLE_TARGETS: RecommendationRoleTarget[] = [
   { role: "ramp", label: "Ramp", target: 8 },
   { role: "draw", label: "Pioche", target: 8 },
   { role: "removal", label: "Removal", target: 6 },
   { role: "board-wipe", label: "Wrath / Board wipe", target: 2 },
   { role: "protection", label: "Protection", target: 3 },
   { role: "recursion", label: "Récursion", target: 2 },
+  { role: "finisher", label: "Finisher", target: 2 },
+];
+
+const STANDARD_RECOMMENDATION_ROLE_TARGETS: RecommendationRoleTarget[] = [
+  { role: "ramp", label: "Ramp", target: 4 },
+  { role: "draw", label: "Pioche", target: 6 },
+  { role: "removal", label: "Removal", target: 6 },
+  { role: "board-wipe", label: "Wrath / Board wipe", target: 2 },
+  { role: "protection", label: "Protection", target: 2 },
+  { role: "recursion", label: "Récursion", target: 1 },
   { role: "finisher", label: "Finisher", target: 2 },
 ];
 
@@ -222,7 +233,7 @@ const SECTION_FOLDERS: DeckFolder[] = [
   {
     id: "mainboard",
     label: "Deck principal",
-    description: "Cartes actuellement dans les 99",
+    description: "Cartes actuellement dans le deck principal",
     symbol: "MAIN",
     predicate: (entry) => entry.section === "mainboard",
   },
@@ -433,6 +444,8 @@ export default function DeckBuilder({
     };
   }, [analysisDrawer]);
 
+  const format = normalizeDeckFormat(deck.format);
+  const isCommander = format === "Commander";
   const local = useMemo(() => analyzeDeckLocally(deck), [deck]);
   const sharedView = Boolean(sharedBy);
   const readOnly = sharedView || deck.status === "active";
@@ -466,8 +479,9 @@ export default function DeckBuilder({
     };
   }, [deck, local, physicalMissingCopies]);
 
-  const cardsToAdd = Math.max(0, 100 - local.totalCards);
-  const cardsToRemove = Math.max(0, local.totalCards - 100);
+  const deckTarget = isCommander ? 100 : 60;
+  const cardsToAdd = Math.max(0, deckTarget - local.totalCards);
+  const cardsToRemove = isCommander ? Math.max(0, local.totalCards - deckTarget) : 0;
 
   const recommendationRoleNeeds = useMemo(() => {
     const counts = new Map<CardRole, number>();
@@ -479,15 +493,20 @@ export default function DeckBuilder({
       }
     }
 
-    return RECOMMENDATION_ROLE_TARGETS.map((target) => ({
+    const targets = isCommander
+      ? COMMANDER_RECOMMENDATION_ROLE_TARGETS
+      : STANDARD_RECOMMENDATION_ROLE_TARGETS;
+
+    return targets.map((target) => ({
       ...target,
       count: counts.get(target.role) ?? 0,
     }));
-  }, [deck.cards]);
+  }, [deck.cards, isCommander]);
 
   useEffect(() => {
-    if (deck.commanders.length === 0) {
+    if (!isCommander || deck.commanders.length === 0) {
       setRemote(null);
+      setRemoteLoading(false);
       return;
     }
 
@@ -521,11 +540,28 @@ export default function DeckBuilder({
       window.clearTimeout(timeout);
       controller.abort();
     };
-  }, [deck.commanders, deck.cards]);
+  }, [deck.commanders, deck.cards, isCommander]);
+
+  const deckColorIdentity = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          deck.cards
+            .filter((entry) => entry.section === "mainboard")
+            .flatMap((entry) => entry.card.colorIdentity),
+        ),
+      ),
+    [deck.cards],
+  );
 
   useEffect(() => {
     const commanderForSuggestions = deck.commanders[0]?.card;
-    if (!commanderForSuggestions) {
+    if (isCommander && !commanderForSuggestions) {
+      setRecommendations(null);
+      return;
+    }
+
+    if (!isCommander && deck.cards.every((entry) => entry.section !== "mainboard")) {
       setRecommendations(null);
       return;
     }
@@ -541,22 +577,30 @@ export default function DeckBuilder({
             headers: { "Content-Type": "application/json" },
             signal: controller.signal,
             body: JSON.stringify({
-              commander: {
-                name: commanderForSuggestions.name,
-                oracleText: commanderForSuggestions.oracleText,
-                typeLine: commanderForSuggestions.typeLine,
-                colorIdentity: commanderForSuggestions.colorIdentity,
-                keywords: commanderForSuggestions.keywords,
-                faces: commanderForSuggestions.faces,
-              },
+              format,
+              deckColorIdentity,
+              commander: commanderForSuggestions
+                ? {
+                    name: commanderForSuggestions.name,
+                    oracleText: commanderForSuggestions.oracleText,
+                    typeLine: commanderForSuggestions.typeLine,
+                    colorIdentity: commanderForSuggestions.colorIdentity,
+                    keywords: commanderForSuggestions.keywords,
+                    faces: commanderForSuggestions.faces,
+                  }
+                : undefined,
               deckCardNames: deck.cards
                 .filter((entry) => entry.section === "mainboard")
                 .map((entry) => entry.card.name),
               roleNeeds: recommendationRoleNeeds,
-              bracket: deck.cedhIntent
-                ? 5
-                : remote?.estimatedBracket ?? deck.bracket ?? 2,
-              gameChangerCount: remote?.findings.gameChangerCards.length ?? 0,
+              bracket: isCommander
+                ? deck.cedhIntent
+                  ? 5
+                  : remote?.estimatedBracket ?? deck.bracket ?? 2
+                : null,
+              gameChangerCount: isCommander
+                ? remote?.findings.gameChangerCards.length ?? 0
+                : 0,
             }),
           },
         );
@@ -580,6 +624,9 @@ export default function DeckBuilder({
     deck.cards,
     deck.bracket,
     deck.cedhIntent,
+    format,
+    isCommander,
+    deckColorIdentity,
     recommendationRoleNeeds,
     remote?.estimatedBracket,
     remote?.findings.gameChangerCards.length,
@@ -606,6 +653,12 @@ export default function DeckBuilder({
     });
   };
 
+  const addSideboardCard = (card: MtgCard) => {
+    update({
+      cards: mergeEntries(deck.cards, [{ card, quantity: 1, section: "sideboard" }]),
+    });
+  };
+
   const addComboCardByName = async (name: string) => {
     try {
       const card = await getNamedCard(name);
@@ -615,10 +668,10 @@ export default function DeckBuilder({
     }
   };
 
-  const changeQuantity = (cardId: string, delta: number) => {
+  const changeQuantity = (cardId: string, section: DeckCardEntry["section"], delta: number) => {
     const next = deck.cards
       .map((entry) =>
-        logicalCardId(entry.card) === cardId
+        logicalCardId(entry.card) === cardId && entry.section === section
           ? { ...entry, quantity: Math.max(0, entry.quantity + delta) }
           : entry,
       )
@@ -664,6 +717,15 @@ export default function DeckBuilder({
   const reservedById = inventory.reserved;
 
   const commander = deck.commanders[0]?.card;
+  const standardFeaturedIndex = isCommander
+    ? -1
+    : deck.cards.findIndex((entry) => entry.section === "mainboard");
+  const featuredCard = isCommander
+    ? commander
+    : standardFeaturedIndex >= 0
+      ? deck.cards[standardFeaturedIndex]?.card
+      : undefined;
+  const displayedIdentity = isCommander ? local.commanderIdentity : deckColorIdentity;
 
   const deckFolders = useMemo(() => {
     if (deckDimension === "type") return TYPE_FOLDERS;
@@ -718,10 +780,12 @@ export default function DeckBuilder({
   }, [deck.cards, deckFolderId, visibleDeckCards]);
 
   const detailItems = useMemo(() => {
-    const commanders = deck.commanders.map((entry, index) => ({
-      key: `commander:${index}`,
-      entry,
-    }));
+    const commanders = isCommander
+      ? deck.commanders.map((entry, index) => ({
+          key: `commander:${index}`,
+          entry,
+        }))
+      : [];
 
     const cards = detailCardsForNavigation.map((entry) => {
       const originalIndex = deck.cards.indexOf(entry);
@@ -733,7 +797,7 @@ export default function DeckBuilder({
     });
 
     return [...commanders, ...cards];
-  }, [deck.commanders, deck.cards, detailCardsForNavigation]);
+  }, [deck.commanders, deck.cards, detailCardsForNavigation, isCommander]);
 
   const selectedDetailIndex = selectedEntryKey
     ? detailItems.findIndex((item) => item.key === selectedEntryKey)
@@ -902,19 +966,34 @@ export default function DeckBuilder({
         <button
           type="button"
           className="mtg-deck-builder__commander mtg-deck-builder__commander-button"
-          onClick={() => commander && setSelectedEntryKey("commander:0")}
-          aria-label={commander ? `Voir les détails de ${commander.name}` : "Aucun commandant"}
-          disabled={!commander}
+          onClick={() => {
+            if (isCommander && commander) setSelectedEntryKey("commander:0");
+            if (!isCommander && standardFeaturedIndex >= 0) {
+              setSelectedEntryKey(`card:${standardFeaturedIndex}`);
+            }
+          }}
+          aria-label={
+            featuredCard
+              ? `Voir les détails de ${featuredCard.name}`
+              : isCommander
+                ? "Aucun commandant"
+                : "Deck Standard vide"
+          }
+          disabled={!featuredCard}
         >
-          {commander?.imageUri ? <img src={commander.imageUri} alt={commander.name} /> : <span>CMD</span>}
+          {featuredCard?.imageUri ? (
+            <img src={featuredCard.imageUri} alt={featuredCard.name} />
+          ) : (
+            <span>{isCommander ? "CMD" : "STD"}</span>
+          )}
         </button>
         <div>
           <span className="mtg-tab-page__eyebrow">
             {sharedView
               ? `DECK PARTAGÉ PAR ${sharedBy}`
               : readOnly
-                ? "DECK PRÊT"
-                : "DECK EN CONSTRUCTION"}
+                ? `DECK ${format.toUpperCase()} PRÊT`
+                : `DECK ${format.toUpperCase()} EN CONSTRUCTION`}
           </span>
           <input
             className="mtg-deck-builder__name"
@@ -922,16 +1001,26 @@ export default function DeckBuilder({
             readOnly={readOnly}
             onChange={(event) => !readOnly && update({ name: event.target.value })}
           />
-          <p>{commander ? commander.name : "Aucun commandant"} · Commander</p>
+          <p>
+            {isCommander
+              ? `${commander ? commander.name : "Aucun commandant"} · Commander`
+              : `Standard · ${local.mainboardCount} carte(s) main · ${local.sideboardCount} side`}
+          </p>
           <div className="mtg-deck-builder__identity">
-            {(local.commanderIdentity.length ? local.commanderIdentity : ["C"]).map((color) => (
+            {(displayedIdentity.length ? displayedIdentity : ["C"]).map((color) => (
               <span key={color}>{color}</span>
             ))}
           </div>
         </div>
         <div className="mtg-deck-builder__hero-stats">
-          <div><span>Deck</span><strong>{local.totalCards}/100</strong></div>
-          <div><span>Terrains</span><strong>{local.landCount}</strong></div>
+          <div>
+            <span>Deck</span>
+            <strong>{isCommander ? `${local.totalCards}/100` : `${local.mainboardCount}/60+`}</strong>
+          </div>
+          <div>
+            <span>{isCommander ? "Terrains" : "Sideboard"}</span>
+            <strong>{isCommander ? local.landCount : `${local.sideboardCount}/15`}</strong>
+          </div>
           <div>
             <span>{cardsToRemove > 0 ? "À retirer" : "À ajouter"}</span>
             <strong>{cardsToRemove > 0 ? cardsToRemove : cardsToAdd}</strong>
@@ -943,16 +1032,20 @@ export default function DeckBuilder({
       {!readOnly && onMarkReady && (
         <DeckReadinessPanel
           eligibility={eligibility}
+          format={format}
           onMarkReady={() => {
             if (!eligibility.eligible) return;
-            const detectedBracket = deck.cedhIntent
-              ? 5
-              : remote?.estimatedBracket ?? remote?.minimumBracket ?? deck.bracket;
+            const detectedBracket = isCommander
+              ? deck.cedhIntent
+                ? 5
+                : remote?.estimatedBracket ?? remote?.minimumBracket ?? deck.bracket
+              : undefined;
 
             onMarkReady({
               ...deck,
               status: "active",
-              bracket: detectedBracket ?? deck.bracket,
+              bracket: isCommander ? detectedBracket ?? deck.bracket : undefined,
+              cedhIntent: isCommander ? deck.cedhIntent : undefined,
               updatedAt: new Date().toISOString(),
             });
           }}
@@ -963,24 +1056,46 @@ export default function DeckBuilder({
         <section className="mtg-deck-builder__list-panel">
           {!readOnly && (
             <div className="mtg-deck-builder__tools">
-              <DeckCardPicker
-                label="Choisir / changer le commandant"
-                placeholder="Créature légendaire, Vehicle, Spacecraft…"
-                buttonLabel="Commandant"
-                validate={(card) => {
-                  const result = getCommanderEligibility(card);
-                  return result.ok ? null : result.reason;
-                }}
-                onSelect={replaceCommander}
-              />
+              {isCommander && (
+                <DeckCardPicker
+                  label="Choisir / changer le commandant"
+                  placeholder="Créature légendaire, Vehicle, Spacecraft…"
+                  buttonLabel="Commandant"
+                  validate={(card) => {
+                    const result = getCommanderEligibility(card);
+                    return result.ok ? null : result.reason;
+                  }}
+                  onSelect={replaceCommander}
+                />
+              )}
               <DeckCardPicker label="Ajouter une carte" onSelect={addMainCard} />
+              {!isCommander && (
+                <DeckCardPicker
+                  label="Ajouter au sideboard"
+                  placeholder="Chercher une carte Standard…"
+                  buttonLabel="Sideboard"
+                  onSelect={addSideboardCard}
+                />
+              )}
               <DeckImportPanel
+                format={format}
                 onImport={(entries, commanders) =>
                   update({
-                    cards: mergeEntries(deck.cards, entries),
-                    commanders: commanders.length
-                      ? mergeEntries(deck.commanders, commanders)
-                      : deck.commanders,
+                    cards: mergeEntries(
+                      deck.cards,
+                      isCommander
+                        ? entries
+                        : [
+                            ...entries,
+                            ...commanders.map((entry) => ({ ...entry, section: "mainboard" as const })),
+                          ],
+                    ),
+                    commanders:
+                      isCommander && commanders.length
+                        ? mergeEntries(deck.commanders, commanders)
+                        : isCommander
+                          ? deck.commanders
+                          : [],
                   })
                 }
               />
@@ -1218,9 +1333,9 @@ export default function DeckBuilder({
 
                               {!readOnly && deckDisplayMode === "image-name" && (
                                 <span className="mtg-deck-gallery__controls">
-                                  <button type="button" onClick={() => changeQuantity(logicalCardId(entry.card), -1)}>−</button>
+                                  <button type="button" onClick={() => changeQuantity(logicalCardId(entry.card), entry.section, -1)}>−</button>
                                   <strong>{entry.quantity}</strong>
-                                  <button type="button" onClick={() => changeQuantity(logicalCardId(entry.card), 1)}>+</button>
+                                  <button type="button" onClick={() => changeQuantity(logicalCardId(entry.card), entry.section, 1)}>+</button>
                                 </span>
                               )}
                             </article>
@@ -1267,9 +1382,9 @@ export default function DeckBuilder({
                                 <span className="mtg-deck-list__readonly-quantity">×{entry.quantity}</span>
                               ) : (
                                 <span className="mtg-deck-list__quantity">
-                                  <button type="button" onClick={() => changeQuantity(logicalCardId(entry.card), -1)}>−</button>
+                                  <button type="button" onClick={() => changeQuantity(logicalCardId(entry.card), entry.section, -1)}>−</button>
                                   <strong>{entry.quantity}</strong>
-                                  <button type="button" onClick={() => changeQuantity(logicalCardId(entry.card), 1)}>+</button>
+                                  <button type="button" onClick={() => changeQuantity(logicalCardId(entry.card), entry.section, 1)}>+</button>
                                 </span>
                               )}
                             </div>
@@ -1307,47 +1422,68 @@ export default function DeckBuilder({
             <span className="mtg-analysis-launch-card__arrow">↗</span>
           </button>
 
-          <button
-            type="button"
-            className="mtg-analysis-launch-card is-bracket"
-            onClick={() => {
-              setSelectedEntryKey(null);
-              setAnalysisDrawer("bracket");
-            }}
-          >
-            <span className="mtg-analysis-launch-card__symbol">B</span>
-            <span className="mtg-analysis-launch-card__body">
-              <small>PUISSANCE</small>
-              <strong>Bracket</strong>
-              <em>
-                {remoteLoading
-                  ? "Analyse…"
-                  : `Bracket ${deck.cedhIntent ? 5 : remote?.estimatedBracket ?? remote?.minimumBracket ?? deck.bracket ?? 2}`}
-              </em>
-            </span>
-            <span className="mtg-analysis-launch-card__arrow">↗</span>
-          </button>
+          {isCommander ? (
+            <>
+              <button
+                type="button"
+                className="mtg-analysis-launch-card is-bracket"
+                onClick={() => {
+                  setSelectedEntryKey(null);
+                  setAnalysisDrawer("bracket");
+                }}
+              >
+                <span className="mtg-analysis-launch-card__symbol">B</span>
+                <span className="mtg-analysis-launch-card__body">
+                  <small>PUISSANCE</small>
+                  <strong>Bracket</strong>
+                  <em>
+                    {remoteLoading
+                      ? "Analyse…"
+                      : `Bracket ${deck.cedhIntent ? 5 : remote?.estimatedBracket ?? remote?.minimumBracket ?? deck.bracket ?? 2}`}
+                  </em>
+                </span>
+                <span className="mtg-analysis-launch-card__arrow">↗</span>
+              </button>
 
-          <button
-            type="button"
-            className="mtg-analysis-launch-card is-combo"
-            onClick={() => {
-              setSelectedEntryKey(null);
-              setAnalysisDrawer("combos");
-            }}
-          >
-            <span className="mtg-analysis-launch-card__symbol">∞</span>
-            <span className="mtg-analysis-launch-card__body">
-              <small>COMMANDER SPELLBOOK</small>
-              <strong>Combos</strong>
-              <em>
-                {remoteLoading
-                  ? "Recherche…"
-                  : `${remote?.includedCombos.length ?? 0} complète(s) · ${remote?.almostIncludedCombos.length ?? 0} potentielle(s)`}
-              </em>
-            </span>
-            <span className="mtg-analysis-launch-card__arrow">↗</span>
-          </button>
+              <button
+                type="button"
+                className="mtg-analysis-launch-card is-combo"
+                onClick={() => {
+                  setSelectedEntryKey(null);
+                  setAnalysisDrawer("combos");
+                }}
+              >
+                <span className="mtg-analysis-launch-card__symbol">∞</span>
+                <span className="mtg-analysis-launch-card__body">
+                  <small>COMMANDER SPELLBOOK</small>
+                  <strong>Combos</strong>
+                  <em>
+                    {remoteLoading
+                      ? "Recherche…"
+                      : `${remote?.includedCombos.length ?? 0} complète(s) · ${remote?.almostIncludedCombos.length ?? 0} potentielle(s)`}
+                  </em>
+                </span>
+                <span className="mtg-analysis-launch-card__arrow">↗</span>
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="mtg-analysis-launch-card is-bracket"
+              onClick={() => {
+                setSelectedEntryKey(null);
+                setAnalysisDrawer("legality");
+              }}
+            >
+              <span className="mtg-analysis-launch-card__symbol">✓</span>
+              <span className="mtg-analysis-launch-card__body">
+                <small>FORMAT</small>
+                <strong>Légalité Standard</strong>
+                <em>{eligibility.eligible ? "Deck conforme" : "Vérifications à corriger"}</em>
+              </span>
+              <span className="mtg-analysis-launch-card__arrow">↗</span>
+            </button>
+          )}
 
           <button
             type="button"
@@ -1394,9 +1530,11 @@ export default function DeckBuilder({
                     ? "Structure & statistiques"
                     : analysisDrawer === "bracket"
                       ? "Bracket & niveau de puissance"
-                      : analysisDrawer === "combos"
-                        ? "Combos & lignes de jeu"
-                        : "Cartes clés & suggestions"}
+                      : analysisDrawer === "legality"
+                        ? "Légalité & règles Standard"
+                        : analysisDrawer === "combos"
+                          ? "Combos & lignes de jeu"
+                          : "Cartes clés & suggestions"}
                 </strong>
               </div>
               <button
@@ -1410,9 +1548,13 @@ export default function DeckBuilder({
             </header>
 
             <div className="mtg-analysis-drawer__content">
-              {analysisDrawer === "stats" && <DeckStatsPanel analysis={local} />}
+              {analysisDrawer === "stats" && <DeckStatsPanel analysis={local} format={format} />}
 
-              {analysisDrawer === "bracket" && (
+              {analysisDrawer === "legality" && (
+                <DeckReadinessPanel eligibility={eligibility} format={format} />
+              )}
+
+              {analysisDrawer === "bracket" && isCommander && (
                 <DeckBracketPanel
                   analysis={remote}
                   loading={remoteLoading}
@@ -1422,7 +1564,7 @@ export default function DeckBuilder({
                 />
               )}
 
-              {analysisDrawer === "combos" && (
+              {analysisDrawer === "combos" && isCommander && (
                 <DeckComboPanel
                   included={remote?.includedCombos ?? []}
                   almost={remote?.almostIncludedCombos ?? []}
@@ -1437,6 +1579,7 @@ export default function DeckBuilder({
                   analysis={recommendations}
                   loading={recommendationsLoading}
                   collection={collection}
+                  format={format}
                   readOnly={readOnly}
                   onAddCard={readOnly ? undefined : addMainCard}
                 />

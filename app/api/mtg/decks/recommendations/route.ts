@@ -9,6 +9,7 @@ import {
 } from "@/lib/mtg/scryfall";
 import type {
   CommanderBracket,
+  DeckFormat,
   DeckCardSuggestion,
   DeckRecommendations,
   MtgCard,
@@ -22,6 +23,8 @@ type RoleNeed = {
 };
 
 type RecommendationRequest = {
+  format?: DeckFormat;
+  deckColorIdentity?: string[];
   commander?: Pick<
     MtgCard,
     "name" | "oracleText" | "typeLine" | "colorIdentity" | "keywords" | "faces"
@@ -171,15 +174,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
   }
 
-  if (!body.commander?.name) {
+  const format: DeckFormat = body.format === "Standard" ? "Standard" : "Commander";
+  const commander = body.commander;
+
+  if (format === "Commander" && !commander?.name) {
     return NextResponse.json({ available: true, suggestions: [] } satisfies DeckRecommendations);
   }
 
-  const commander = body.commander;
   const deckNames = new Set(
-    [commander.name, ...(body.deckCardNames ?? [])].map((name) => name.toLocaleLowerCase("en")),
+    [commander?.name, ...(body.deckCardNames ?? [])]
+      .filter((name): name is string => Boolean(name))
+      .map((name) => name.toLocaleLowerCase("en")),
   );
-  const base = `legal:commander game:paper -is:funny ${identityQuery(commander.colorIdentity ?? [])}`;
+  const identity = format === "Commander"
+    ? commander?.colorIdentity ?? []
+    : body.deckColorIdentity ?? [];
+  const base = `${format === "Commander" ? "legal:commander" : "legal:standard"} game:paper -is:funny ${identity.length ? identityQuery(identity) : ""}`.trim();
   const needs = [...(body.roleNeeds ?? [])]
     .filter((need) => need.count < need.target && ROLE_QUERIES[need.role])
     .sort((a, b) => (b.target - b.count) - (a.target - a.count));
@@ -188,10 +198,13 @@ export async function POST(request: Request) {
     {
       query: "-t:land",
       kind: "staple",
-      reason: "Carte fréquemment jouée en Commander dans cette identité couleur.",
+      reason:
+        format === "Commander"
+          ? "Carte fréquemment jouée en Commander dans cette identité couleur."
+          : "Carte légale en Standard cohérente avec les couleurs actuelles du deck.",
       bonus: 12,
     },
-    ...buildSynergyQueries(commander),
+    ...(format === "Commander" && commander ? buildSynergyQueries(commander) : []),
     ...needs.slice(0, 2).map<QuerySpec>((need) => ({
       query: ROLE_QUERIES[need.role]!,
       kind: "role-gap",
@@ -210,7 +223,8 @@ export async function POST(request: Request) {
 
       cards.forEach((card, index) => {
         if (deckNames.has(card.name.toLocaleLowerCase("en"))) return;
-        if (card.legalities?.commander && card.legalities.commander !== "legal") return;
+        const legality = format === "Commander" ? card.legalities?.commander : card.legalities?.standard;
+        if (legality && legality !== "legal") return;
 
         const id = card.oracleId ?? card.id;
         const existing = candidates.get(id) ?? {
@@ -244,7 +258,9 @@ export async function POST(request: Request) {
           );
         }
 
-        const isGameChanger = detectOfficialGameChangers([candidate.card.name]).length > 0;
+        const isGameChanger =
+          format === "Commander" &&
+          detectOfficialGameChangers([candidate.card.name]).length > 0;
         if (isGameChanger) candidate.score -= bracket <= 3 ? 18 : 0;
 
         return {
@@ -257,6 +273,7 @@ export async function POST(request: Request) {
         };
       })
       .filter((suggestion) => {
+        if (format === "Standard") return true;
         if (!suggestion.isGameChanger) return true;
         if (bracket <= 2) return false;
         if (bracket === 3 && currentGameChangers >= 3) return false;

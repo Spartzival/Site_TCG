@@ -9,9 +9,12 @@ import {
   slugifyDeckName,
 } from "@/lib/mtg/deck-storage";
 import { getCommanderEligibility } from "@/lib/mtg/deck-analyzer";
-import type { DeckProject, MtgCard } from "@/types/mtg";
+import { normalizeDeckFormat } from "@/lib/mtg/deck-format";
+import type { DeckFormat, DeckProject, MtgCard } from "@/types/mtg";
 
-export default function DeckProjectsTab() {
+type Props = { format: DeckFormat };
+
+export default function DeckProjectsTab({ format }: Props) {
   const [projects, setProjects] = useState<DeckProject[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -28,8 +31,17 @@ export default function DeckProjectsTab() {
     if (hydrated) saveDeckProjects(projects);
   }, [projects, hydrated]);
 
+  useEffect(() => {
+    setSelectedId(null);
+    setCreating(false);
+    setNewName("");
+    setNewCommander(null);
+  }, [format]);
+
   const selected = projects.find((project) => project.id === selectedId) ?? null;
-  const buildingProjects = projects.filter((project) => project.status === "building");
+  const buildingProjects = projects.filter(
+    (project) => project.status === "building" && normalizeDeckFormat(project.format) === format,
+  );
 
   if (selected) {
     return (
@@ -57,10 +69,13 @@ export default function DeckProjectsTab() {
   }
 
   const createProject = () => {
-    if (!newName.trim() || !newCommander) return;
+    if (!newName.trim()) return;
+    if (format === "Commander" && !newCommander) return;
 
-    const commanderCheck = getCommanderEligibility(newCommander);
-    if (!commanderCheck.ok) return;
+    if (format === "Commander" && newCommander) {
+      const commanderCheck = getCommanderEligibility(newCommander);
+      if (!commanderCheck.ok) return;
+    }
 
     const now = new Date().toISOString();
     const id = crypto.randomUUID();
@@ -68,9 +83,12 @@ export default function DeckProjectsTab() {
       id,
       name: newName.trim(),
       slug: `${slugifyDeckName(newName)}-${id.slice(0, 6)}`,
-      format: "Commander",
+      format,
       status: "building",
-      commanders: [{ card: newCommander, quantity: 1, section: "commander" }],
+      commanders:
+        format === "Commander" && newCommander
+          ? [{ card: newCommander, quantity: 1, section: "commander" }]
+          : [],
       cards: [],
       createdAt: now,
       updatedAt: now,
@@ -87,9 +105,13 @@ export default function DeckProjectsTab() {
     <div className="mtg-tab-page">
       <div className="mtg-tab-page__header">
         <div>
-          <span className="mtg-tab-page__eyebrow">DECK LAB</span>
+          <span className="mtg-tab-page__eyebrow">{format.toUpperCase()} · DECK LAB</span>
           <h2>Decks en construction</h2>
-          <p>Création, import, bracket dynamique, combos et statistiques de mana.</p>
+          <p>
+            {format === "Commander"
+              ? "Création, import, bracket dynamique, combos et statistiques de mana."
+              : "Création, import, légalité Standard, rôles, statistiques et collection partagée."}
+          </p>
         </div>
         <button
           className="mtg-primary-button"
@@ -103,45 +125,56 @@ export default function DeckProjectsTab() {
       {creating && (
         <section className="mtg-new-deck">
           <div>
-            <span className="mtg-tab-page__eyebrow">NOUVEAU COMMANDER</span>
-            <h3>Créer un deck en construction</h3>
+            <span className="mtg-tab-page__eyebrow">NOUVEAU {format.toUpperCase()}</span>
+            <h3>Créer un deck {format}</h3>
           </div>
 
           <label className="mtg-new-deck__name">
             <span>Nom du projet</span>
             <input
               value={newName}
-              placeholder="Ex. Kona stompy"
+              placeholder={format === "Commander" ? "Ex. Kona stompy" : "Ex. Golgari Midrange"}
               onChange={(event) => setNewName(event.target.value)}
             />
           </label>
 
-          <DeckCardPicker
-            label="Commandant"
-            placeholder="Kona, Rescue Beastie…"
-            buttonLabel="Choisir"
-            validate={(card) => {
-              const result = getCommanderEligibility(card);
-              return result.ok ? null : result.reason;
-            }}
-            onSelect={setNewCommander}
-          />
+          {format === "Commander" && (
+            <>
+              <DeckCardPicker
+                label="Commandant"
+                placeholder="Kona, Rescue Beastie…"
+                buttonLabel="Choisir"
+                validate={(card) => {
+                  const result = getCommanderEligibility(card);
+                  return result.ok ? null : result.reason;
+                }}
+                onSelect={setNewCommander}
+              />
 
-          {newCommander && (
-            <div className="mtg-new-deck__commander">
-              {newCommander.imageUri && <img src={newCommander.imageUri} alt="" />}
-              <div>
-                <span>COMMANDANT SÉLECTIONNÉ</span>
-                <strong>{newCommander.name}</strong>
-                <small>{newCommander.colorIdentity.join("") || "C"}</small>
-              </div>
+              {newCommander && (
+                <div className="mtg-new-deck__commander">
+                  {newCommander.imageUri && <img src={newCommander.imageUri} alt="" />}
+                  <div>
+                    <span>COMMANDANT SÉLECTIONNÉ</span>
+                    <strong>{newCommander.name}</strong>
+                    <small>{newCommander.colorIdentity.join("") || "C"}</small>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {format === "Standard" && (
+            <div className="mtg-format-create-note">
+              <strong>STANDARD</strong>
+              <span>60 cartes minimum · sideboard jusqu’à 15 · 4 exemplaires maximum par carte hors exceptions.</span>
             </div>
           )}
 
           <button
             className="mtg-primary-button"
             type="button"
-            disabled={!newName.trim() || !newCommander}
+            disabled={!newName.trim() || (format === "Commander" && !newCommander)}
             onClick={createProject}
           >
             Créer le projet
@@ -155,11 +188,8 @@ export default function DeckProjectsTab() {
         <div className="mtg-empty-state">
           <span className="mtg-empty-state__number">03</span>
           <div>
-            <strong>Aucun deck en construction</strong>
-            <p>
-              Crée un nouveau projet ou remets un deck prêt en construction depuis
-              l&apos;onglet Mes decks.
-            </p>
+            <strong>Aucun deck {format} en construction</strong>
+            <p>Crée un nouveau projet {format} ou remets un deck prêt en construction.</p>
           </div>
         </div>
       ) : (
@@ -174,6 +204,7 @@ export default function DeckProjectsTab() {
               0,
             );
             const total = mainCount + commanderCount;
+            const featured = commander ?? project.cards.find((entry) => entry.section === "mainboard")?.card;
 
             return (
               <button
@@ -183,12 +214,14 @@ export default function DeckProjectsTab() {
                 onClick={() => setSelectedId(project.id)}
               >
                 <span className="mtg-deck-project-card__image">
-                  {commander?.imageUri ? <img src={commander.imageUri} alt="" /> : "CMD"}
+                  {featured?.imageUri ? <img src={featured.imageUri} alt="" /> : format === "Commander" ? "CMD" : "STD"}
                 </span>
                 <span className="mtg-deck-project-card__content">
-                  <small>COMMANDER · {total}/100</small>
+                  <small>
+                    {format === "Commander" ? `COMMANDER · ${total}/100` : `STANDARD · ${mainCount}/60+`}
+                  </small>
                   <strong>{project.name}</strong>
-                  <span>{commander?.name ?? "Sans commandant"}</span>
+                  <span>{format === "Commander" ? commander?.name ?? "Sans commandant" : "Deck Standard"}</span>
                   <em>Ouvrir le deck →</em>
                 </span>
               </button>

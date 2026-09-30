@@ -1,11 +1,12 @@
-import type { DeckEligibility } from "@/types/mtg";
+import type { DeckEligibility, DeckFormat } from "@/types/mtg";
 
 type Props = {
   eligibility: DeckEligibility;
-  onMarkReady: () => void;
+  format: DeckFormat;
+  onMarkReady?: () => void;
 };
 
-export default function DeckReadinessPanel({ eligibility, onMarkReady }: Props) {
+export default function DeckReadinessPanel({ eligibility, format, onMarkReady }: Props) {
   return (
     <section className={`mtg-readiness-panel ${eligibility.eligible ? "is-ready" : ""}`}>
       <div className="mtg-readiness-panel__summary">
@@ -13,17 +14,19 @@ export default function DeckReadinessPanel({ eligibility, onMarkReady }: Props) 
         <strong>{eligibility.eligible ? "Prêt à jouer" : "Pas encore prêt"}</strong>
         <p>
           {eligibility.eligible
-            ? "Les règles Commander et la disponibilité physique des cartes sont satisfaites. Tu peux déplacer ce deck dans Mes decks."
+            ? `Les règles ${format} et la disponibilité physique des cartes sont satisfaites.`
             : "Corrige les règles, la taille du deck ou les exemplaires indisponibles avant de le classer comme prêt."}
         </p>
-        <button
-          type="button"
-          className="mtg-primary-button"
-          disabled={!eligibility.eligible}
-          onClick={onMarkReady}
-        >
-          Marquer comme prêt →
-        </button>
+        {onMarkReady && (
+          <button
+            type="button"
+            className="mtg-primary-button"
+            disabled={!eligibility.eligible}
+            onClick={onMarkReady}
+          >
+            Marquer comme prêt →
+          </button>
+        )}
       </div>
 
       <div className="mtg-readiness-panel__checks">
