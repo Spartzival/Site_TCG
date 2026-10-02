@@ -5730,3 +5730,398 @@ a {
     width: min(100%, 360px);
   }
 }
+
+/* ================================================================
+   MTG — VIEWPORT / IMPORT RESPONSIVE FIXES
+   ================================================================ */
+
+/* Les composants principaux doivent toujours être autorisés à rétrécir.
+   Sans min-width:0, les grids/flex peuvent élargir la page au resize. */
+.mtg-dashboard,
+.mtg-dashboard__header,
+.mtg-dashboard__tabs,
+.mtg-dashboard__content,
+.mtg-tab-page,
+.mtg-tab-page__header,
+.mtg-deck-builder,
+.mtg-deck-builder__workspace,
+.mtg-deck-builder__list-panel,
+.mtg-deck-builder__tools,
+.mtg-deck-analysis-dock,
+.mtg-deck-list,
+.mtg-deck-gallery,
+.mtg-analysis-drawer,
+.mtg-analysis-drawer__content,
+.mtg-card-drawer,
+.mtg-social-dialog,
+.mtg-add-dialog {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.mtg-dashboard {
+  overflow-x: clip;
+}
+
+/* ---------- Import de deck : vraie modale viewport-safe ---------- */
+.mtg-deck-import {
+  position: static;
+}
+
+.mtg-deck-import__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: clamp(10px, 2.5vw, 28px);
+  background: rgba(3, 2, 2, 0.76);
+  backdrop-filter: blur(14px);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.mtg-deck-import__panel {
+  position: relative;
+  inset: auto;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: min(760px, 100%);
+  max-height: min(860px, calc(100dvh - 2 * clamp(10px, 2.5vw, 28px)));
+  padding: 0;
+  overflow: hidden;
+  color: #f5efe6;
+  background:
+    radial-gradient(circle at 88% 0%, rgba(201, 139, 60, 0.13), transparent 30%),
+    #0d0907;
+  border: 1px solid rgba(212, 164, 93, 0.25);
+  border-radius: 18px;
+  box-shadow: 0 34px 110px rgba(0, 0, 0, 0.68);
+}
+
+.mtg-deck-import__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 22px 24px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.075);
+  background: rgba(13, 9, 7, 0.96);
+}
+
+.mtg-deck-import__header > div {
+  min-width: 0;
+}
+
+.mtg-deck-import__header span {
+  display: block;
+  color: rgba(216, 169, 100, 0.62);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.mtg-deck-import__header h3 {
+  margin: 6px 0 0;
+  font-size: clamp(23px, 4vw, 34px);
+  font-weight: 400;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+}
+
+.mtg-deck-import__body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 20px 24px;
+}
+
+.mtg-deck-import__body label {
+  display: grid;
+  gap: 8px;
+}
+
+.mtg-deck-import__body textarea {
+  display: block;
+  width: 100%;
+  height: clamp(190px, 42dvh, 390px);
+  min-height: 150px;
+  max-height: 55dvh;
+  resize: vertical;
+  padding: 14px;
+  color: #f7efe5;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  outline: none;
+  font: 12px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace;
+  box-sizing: border-box;
+}
+
+.mtg-deck-import__body textarea:focus {
+  border-color: rgba(212, 164, 93, 0.58);
+  box-shadow: 0 0 0 3px rgba(212, 164, 93, 0.055);
+}
+
+.mtg-deck-import__help {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 12px;
+  color: rgba(255, 255, 255, 0.42);
+  border: 1px solid rgba(212, 164, 93, 0.12);
+  background: rgba(212, 164, 93, 0.035);
+  font-size: 10px;
+}
+
+.mtg-deck-import__help > span,
+.mtg-deck-import__help > small {
+  width: 100%;
+}
+
+.mtg-deck-import__help code {
+  padding: 5px 7px;
+  color: #deb776;
+  background: rgba(0, 0, 0, 0.24);
+}
+
+.mtg-deck-import__actions {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin: 0;
+  padding: 16px 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.075);
+  background: rgba(13, 9, 7, 0.98);
+  box-shadow: 0 -12px 30px rgba(0, 0, 0, 0.16);
+}
+
+/* ---------- Import bulk : header/footer restent accessibles ---------- */
+.mtg-dialog-backdrop {
+  min-height: 100dvh;
+  padding: clamp(10px, 2.5vw, 24px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.mtg-collection-import-dialog {
+  width: min(760px, 100%);
+  max-height: calc(100dvh - 2 * clamp(10px, 2.5vw, 24px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: clamp(18px, 3vw, 28px);
+}
+
+.mtg-collection-import-dialog .mtg-add-dialog__header {
+  position: sticky;
+  top: calc(-1 * clamp(18px, 3vw, 28px));
+  z-index: 4;
+  margin-inline: calc(-1 * clamp(18px, 3vw, 28px));
+  padding: clamp(18px, 3vw, 28px);
+  padding-bottom: 18px;
+  background: rgba(13, 9, 7, 0.97);
+  backdrop-filter: blur(10px);
+}
+
+.mtg-collection-import-dialog .mtg-add-dialog__footer {
+  position: sticky;
+  bottom: calc(-1 * clamp(18px, 3vw, 28px));
+  z-index: 4;
+  margin-inline: calc(-1 * clamp(18px, 3vw, 28px));
+  margin-bottom: calc(-1 * clamp(18px, 3vw, 28px));
+  padding: 16px clamp(18px, 3vw, 28px) clamp(18px, 3vw, 28px);
+  background: rgba(13, 9, 7, 0.98);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 -12px 28px rgba(0, 0, 0, 0.18);
+}
+
+.mtg-collection-import__field textarea {
+  min-height: clamp(180px, 38dvh, 320px);
+  max-height: 48dvh;
+}
+
+/* ---------- Redimensionnement général ---------- */
+.mtg-tab-page__header,
+.mtg-deck-builder__hero,
+.mtg-deck-builder__tools,
+.mtg-tab-page__actions,
+.mtg-deck-view-toolbar,
+.mtg-library-toolbar {
+  min-width: 0;
+}
+
+.mtg-tab-page__header > *,
+.mtg-deck-builder__hero > *,
+.mtg-deck-builder__tools > * {
+  min-width: 0;
+}
+
+@media (max-width: 1080px) {
+  .mtg-dashboard__intro {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .mtg-dashboard__edition {
+    min-width: 0;
+    width: 100%;
+    padding-left: 0;
+    padding-top: 15px;
+    border-left: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .mtg-tab-page__header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .mtg-tab-page__actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 760px) {
+  .mtg-dashboard {
+    padding-inline: clamp(12px, 4vw, 20px);
+  }
+
+  .mtg-dashboard__content {
+    padding-top: 34px;
+  }
+
+  .mtg-deck-import__backdrop {
+    align-items: end;
+    padding: 0;
+  }
+
+  .mtg-deck-import__panel {
+    width: 100%;
+    max-height: 94dvh;
+    border-radius: 20px 20px 0 0;
+    border-inline: 0;
+    border-bottom: 0;
+  }
+
+  .mtg-deck-import__header,
+  .mtg-deck-import__body,
+  .mtg-deck-import__actions {
+    padding-inline: 16px;
+  }
+
+  .mtg-deck-import__actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+
+  .mtg-deck-import__actions button {
+    width: 100%;
+  }
+
+  .mtg-deck-import__body textarea {
+    height: clamp(180px, 38dvh, 300px);
+    max-height: 45dvh;
+  }
+
+  .mtg-collection-import-dialog {
+    max-height: calc(100dvh - 12px);
+  }
+
+  .mtg-collection-import-dialog .mtg-add-dialog__footer {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .mtg-collection-import-dialog .mtg-add-dialog__footer button {
+    width: 100%;
+  }
+
+  .mtg-deck-builder__hero-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .mtg-deck-builder__hero-stats div {
+    min-width: 0;
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.065);
+  }
+
+  .mtg-deck-list__row,
+  .mtg-deck-list__header {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 520px) {
+  .mtg-dashboard__intro h1 {
+    font-size: clamp(42px, 16vw, 68px);
+  }
+
+  .mtg-tab-page__header {
+    margin-bottom: 28px;
+  }
+
+  .mtg-tab-page__header h2 {
+    font-size: clamp(28px, 10vw, 40px);
+  }
+
+  .mtg-tab-page__actions > button,
+  .mtg-tab-page__actions > .mtg-secondary-button,
+  .mtg-tab-page__actions > .mtg-primary-button {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .mtg-deck-builder__hero-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .mtg-deck-gallery.is-image-only,
+  .mtg-deck-gallery.is-image-name {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .mtg-deck-gallery.is-image-only {
+    padding-inline: 0;
+  }
+}
+
+/* Les écrans très bas (laptop avec zoom, mobile paysage) gardent toujours les actions. */
+@media (max-height: 650px) {
+  .mtg-deck-import__panel {
+    max-height: calc(100dvh - 12px);
+  }
+
+  .mtg-deck-import__header {
+    padding-block: 13px;
+  }
+
+  .mtg-deck-import__header h3 {
+    font-size: 22px;
+  }
+
+  .mtg-deck-import__body {
+    padding-block: 12px;
+  }
+
+  .mtg-deck-import__body textarea,
+  .mtg-collection-import__field textarea {
+    min-height: 135px;
+    height: 30dvh;
+  }
+
+  .mtg-deck-import__actions {
+    padding-block: 10px;
+  }
+}

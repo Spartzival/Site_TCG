@@ -1,10 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { parseDeckText } from "@/lib/mtg/deck-parser";
 import type { DeckCardEntry, DeckFormat } from "@/types/mtg";
 import { resolveCardCollection } from "@/lib/mtg/api-client";
-import { indexCardsByNameAliases, normalizeCardLookupName } from "@/lib/mtg/card-identity";
+import {
+  indexCardsByNameAliases,
+  normalizeCardLookupName,
+} from "@/lib/mtg/card-identity";
 
 type Props = {
   format: DeckFormat;
@@ -17,8 +20,28 @@ export default function DeckImportPanel({ format, onImport }: Props) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!open) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !loading) {
+        setOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open, loading]);
+
+  const close = () => {
+    if (loading) return;
+    setOpen(false);
+    setMessage(null);
+  };
+
   const runImport = async () => {
     const parsed = parseDeckText(text);
+
     if (parsed.entries.length === 0) {
       setMessage("Aucune ligne de deck valide détectée.");
       return;
@@ -40,7 +63,11 @@ export default function DeckImportPanel({ format, onImport }: Props) {
         if (!card) continue;
 
         if (format === "Standard" && parsedEntry.section === "commander") {
-          entries.push({ card, quantity: parsedEntry.quantity, section: "mainboard" });
+          entries.push({
+            card,
+            quantity: parsedEntry.quantity,
+            section: "mainboard",
+          });
           continue;
         }
 
@@ -57,15 +84,22 @@ export default function DeckImportPanel({ format, onImport }: Props) {
       onImport(entries, commanders);
 
       const warnings = [
-        ...(payload.notFound ?? []).map((name) => `Introuvable: ${name}`),
-        ...parsed.ignored.map((line) => `Ignorée: ${line}`),
+        ...(payload.notFound ?? []).map((name) => `Introuvable : ${name}`),
+        ...parsed.ignored.map((line) => `Ignorée : ${line}`),
       ];
 
       setMessage(
         `${entries.length + commanders.length} ligne(s) importée(s)` +
           (warnings.length ? ` · ${warnings.length} avertissement(s)` : ""),
       );
-      setText("");
+
+      if (entries.length + commanders.length > 0) {
+        setText("");
+        window.setTimeout(() => {
+          setOpen(false);
+          setMessage(null);
+        }, 650);
+      }
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "Import impossible.");
     } finally {
@@ -78,37 +112,95 @@ export default function DeckImportPanel({ format, onImport }: Props) {
       <button
         type="button"
         className="mtg-secondary-button"
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => {
+          setOpen(true);
+          setMessage(null);
+        }}
       >
-        {open ? "Fermer l'import" : "Importer une liste"}
+        Importer une liste
       </button>
 
       {open && (
-        <div className="mtg-deck-import__panel">
-          <label>
-            <span>Decklist texte</span>
-            <textarea
-              value={text}
-              placeholder={
-                format === "Commander"
-                  ? `// Commander\n1 Kona, Rescue Beastie\n\n// Main\n1 Sol Ring\n1 Llanowar Elves\n...`
-                  : `// Main\n4 Llanowar Elves\n4 Lightning Strike\n24 Forest\n...\n\n// Sideboard\n2 Duress\n...`
-              }
-              onChange={(event) => setText(event.target.value)}
-            />
-          </label>
-          <div className="mtg-deck-import__actions">
-            <small>Formats acceptés : “1 Sol Ring” ou “1x Sol Ring”.</small>
-            <button
-              type="button"
-              className="mtg-primary-button"
-              disabled={loading || !text.trim()}
-              onClick={() => void runImport()}
-            >
-              {loading ? "Import…" : "Importer"}
-            </button>
-          </div>
-          {message && <p className="mtg-deck-import__message">{message}</p>}
+        <div
+          className="mtg-deck-import__backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) close();
+          }}
+        >
+          <section
+            className="mtg-deck-import__panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="mtg-deck-import-title"
+          >
+            <div className="mtg-deck-import__header">
+              <div>
+                <span>DECKLIST IMPORT</span>
+                <h3 id="mtg-deck-import-title">
+                  Importer une liste {format}
+                </h3>
+              </div>
+
+              <button
+                type="button"
+                className="mtg-icon-button"
+                onClick={close}
+                disabled={loading}
+                aria-label="Fermer l'import"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="mtg-deck-import__body">
+              <label>
+                <span>Decklist texte</span>
+                <textarea
+                  value={text}
+                  autoFocus
+                  placeholder={
+                    format === "Commander"
+                      ? `// Commander\n1 Kona, Rescue Beastie\n\n// Main\n1 Sol Ring\n1 Llanowar Elves\n...`
+                      : `// Main\n4 Llanowar Elves\n4 Lightning Strike\n24 Forest\n...\n\n// Sideboard\n2 Duress\n...`
+                  }
+                  onChange={(event) => setText(event.target.value)}
+                />
+              </label>
+
+              <div className="mtg-deck-import__help">
+                <span>Formats acceptés</span>
+                <code>1 Sol Ring</code>
+                <code>1x Sol Ring</code>
+                <small>
+                  Les sections Commander / Main / Sideboard sont reconnues quand elles
+                  sont présentes dans la liste.
+                </small>
+              </div>
+
+              {message && <p className="mtg-deck-import__message">{message}</p>}
+            </div>
+
+            <div className="mtg-deck-import__actions">
+              <button
+                type="button"
+                className="mtg-secondary-button"
+                onClick={close}
+                disabled={loading}
+              >
+                Annuler
+              </button>
+
+              <button
+                type="button"
+                className="mtg-primary-button"
+                disabled={loading || !text.trim()}
+                onClick={() => void runImport()}
+              >
+                {loading ? "Import…" : "Importer"}
+              </button>
+            </div>
+          </section>
         </div>
       )}
     </div>
