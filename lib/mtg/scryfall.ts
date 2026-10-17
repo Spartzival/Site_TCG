@@ -5,6 +5,16 @@ export const SCRYFALL_HEADERS = {
   "User-Agent": "CardProjects/0.2 (personal MTG collection manager)",
 };
 
+
+export type ScryfallRelatedCard = {
+  id: string;
+  object?: string;
+  component?: "token" | "combo_piece" | "meld_part" | "meld_result" | string;
+  name: string;
+  type_line?: string;
+  uri?: string;
+};
+
 export type ScryfallFace = {
   name?: string;
   image_uris?: { normal?: string; large?: string };
@@ -40,6 +50,7 @@ export type ScryfallCard = {
   lang?: string;
   details?: string;
   layout?: string;
+  all_parts?: ScryfallRelatedCard[];
 };
 
 export function normalizeScryfallCard(card: ScryfallCard): MtgCard {

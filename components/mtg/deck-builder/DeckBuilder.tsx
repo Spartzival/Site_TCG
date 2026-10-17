@@ -7,6 +7,7 @@ import DeckStatsPanel from "./DeckStatsPanel";
 import DeckBracketPanel from "./DeckBracketPanel";
 import DeckComboPanel from "./DeckComboPanel";
 import DeckRecommendationsPanel from "./DeckRecommendationsPanel";
+import DeckTokensPanel from "./DeckTokensPanel";
 import DeckCardDetailDrawer from "./DeckCardDetailDrawer";
 import DeckReadinessPanel from "./DeckReadinessPanel";
 import ShareDeckDialog from "../social/ShareDeckDialog";
@@ -37,6 +38,7 @@ import type {
   DeckProject,
   DeckRecommendations,
   DeckRemoteAnalysis,
+  DeckTokenAnalysis,
   MtgCard,
 } from "@/types/mtg";
 
@@ -54,7 +56,7 @@ type Props = {
 type DeckDimension = "type" | "color" | "section" | "role";
 type DeckSort = "name" | "quantity" | "mana";
 type DeckDisplayMode = "image" | "image-name" | "name";
-type AnalysisDrawer = "stats" | "bracket" | "legality" | "combos" | "recommendations";
+type AnalysisDrawer = "stats" | "bracket" | "legality" | "combos" | "tokens" | "recommendations";
 
 type RecommendationRoleTarget = {
   role: CardRole;
@@ -412,6 +414,10 @@ export default function DeckBuilder({
   const [remoteLoading, setRemoteLoading] = useState(false);
   const [recommendations, setRecommendations] = useState<DeckRecommendations | null>(null);
   const [recommendationsLoading, setRecommendationsLoading] = useState(false);
+  const [tokens, setTokens] = useState<DeckTokenAnalysis | null>(null);
+  const [tokensLoading, setTokensLoading] = useState(false);
+  const [tokensLoadedSignature, setTokensLoadedSignature] = useState("");
+  const [tokensRefreshNonce, setTokensRefreshNonce] = useState(0);
   const [collection, setCollection] = useState<CollectionCard[]>([]);
   const [selectedEntryKey, setSelectedEntryKey] = useState<string | null>(null);
 
@@ -450,6 +456,26 @@ export default function DeckBuilder({
   const sharedView = Boolean(sharedBy);
   const readOnly = sharedView || deck.status === "active";
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
+
+  const tokenSourceEntries = useMemo(
+    () => [
+      ...(isCommander ? deck.commanders : []),
+      ...deck.cards.filter((entry) => entry.section !== "maybeboard"),
+    ],
+    [deck.commanders, deck.cards, isCommander],
+  );
+
+  const tokenSourceSignature = useMemo(
+    () =>
+      tokenSourceEntries
+        .map(
+          (entry) =>
+            `${entry.card.scryfallId}:${entry.quantity}:${entry.section}`,
+        )
+        .sort()
+        .join("|"),
+    [tokenSourceEntries],
+  );
 
   const inventory = useMemo(
     () => buildAvailableCopies(collection, allDecks, deck.id),
@@ -631,6 +657,77 @@ export default function DeckBuilder({
     remote?.estimatedBracket,
     remote?.findings.gameChangerCards.length,
   ]);
+
+  useEffect(() => {
+    if (analysisDrawer !== "tokens") return;
+
+    if (
+      tokens &&
+      tokensLoadedSignature === tokenSourceSignature &&
+      tokensRefreshNonce === 0
+    ) {
+      return;
+    }
+
+    if (tokenSourceEntries.length === 0) {
+      setTokens({ available: true, tokens: [], sourceCardCount: 0 });
+      setTokensLoadedSignature(tokenSourceSignature);
+      setTokensRefreshNonce(0);
+      return;
+    }
+
+    const controller = new AbortController();
+    setTokensLoading(true);
+
+    void fetchJson<DeckTokenAnalysis>("/api/mtg/decks/tokens", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify({
+        cards: tokenSourceEntries.map((entry) => ({
+          scryfallId: entry.card.scryfallId,
+          name: entry.card.name,
+          quantity: entry.quantity,
+          section: entry.section,
+        })),
+      }),
+    })
+      .then((payload) => {
+        if (controller.signal.aborted) return;
+        setTokens(payload);
+        setTokensLoadedSignature(tokenSourceSignature);
+        setTokensRefreshNonce(0);
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        setTokens({
+          available: false,
+          tokens: [],
+          sourceCardCount: tokenSourceEntries.length,
+          error: error instanceof Error ? error.message : "Tokens indisponibles.",
+        });
+        setTokensLoadedSignature(tokenSourceSignature);
+        setTokensRefreshNonce(0);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setTokensLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [
+    analysisDrawer,
+    tokenSourceEntries,
+    tokenSourceSignature,
+    tokens,
+    tokensLoadedSignature,
+    tokensRefreshNonce,
+  ]);
+
+  const refreshTokens = () => {
+    setTokens(null);
+    setTokensLoadedSignature("");
+    setTokensRefreshNonce((value) => value + 1);
+  };
 
   const update = (patch: Partial<DeckProject>) => {
     onChange({ ...deck, ...patch, updatedAt: new Date().toISOString() });
@@ -1487,6 +1584,29 @@ export default function DeckBuilder({
 
           <button
             type="button"
+            className="mtg-analysis-launch-card is-token"
+            onClick={() => {
+              setSelectedEntryKey(null);
+              setAnalysisDrawer("tokens");
+            }}
+          >
+            <span className="mtg-analysis-launch-card__symbol">◈</span>
+            <span className="mtg-analysis-launch-card__body">
+              <small>ACCESSOIRES</small>
+              <strong>Tokens</strong>
+              <em>
+                {tokensLoading
+                  ? "Recherche…"
+                  : tokens && tokensLoadedSignature === tokenSourceSignature
+                    ? `${tokens.tokens.length} token(s) lié(s)`
+                    : "Détection automatique"}
+              </em>
+            </span>
+            <span className="mtg-analysis-launch-card__arrow">↗</span>
+          </button>
+
+          <button
+            type="button"
             className="mtg-analysis-launch-card is-recommendation"
             onClick={() => {
               setSelectedEntryKey(null);
@@ -1534,7 +1654,9 @@ export default function DeckBuilder({
                         ? "Légalité & règles Standard"
                         : analysisDrawer === "combos"
                           ? "Combos & lignes de jeu"
-                          : "Cartes clés & suggestions"}
+                          : analysisDrawer === "tokens"
+                            ? "Tokens, emblèmes & accessoires"
+                            : "Cartes clés & suggestions"}
                 </strong>
               </div>
               <button
@@ -1571,6 +1693,14 @@ export default function DeckBuilder({
                   loading={remoteLoading}
                   readOnly={readOnly}
                   onAddMissingCard={readOnly ? undefined : addComboCardByName}
+                />
+              )}
+
+              {analysisDrawer === "tokens" && (
+                <DeckTokensPanel
+                  analysis={tokens}
+                  loading={tokensLoading}
+                  onRefresh={refreshTokens}
                 />
               )}
 

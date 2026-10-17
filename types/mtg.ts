@@ -101,6 +101,32 @@ export type DeckProject = MtgDeck & {
   updatedAt: string;
 };
 
+
+export type DeckTokenSource = {
+  cardId: string;
+  name: string;
+  quantity: number;
+  section: DeckSection;
+};
+
+export type DeckTokenKind = "token" | "emblem" | "copy" | "variable";
+
+export type DeckTokenItem = {
+  id: string;
+  kind: DeckTokenKind;
+  name: string;
+  card?: MtgCard;
+  sources: DeckTokenSource[];
+  sourceCopies: number;
+};
+
+export type DeckTokenAnalysis = {
+  available: boolean;
+  tokens: DeckTokenItem[];
+  sourceCardCount: number;
+  error?: string;
+};
+
 export type DeckCard = {
   deckId: string;
   cardId: string;

@@ -30,3 +30,16 @@ Le texte copié contient uniquement les quantités et les noms canoniques des ca
 - Nouveau panneau Cartes clés / Suggestions : synergie avec le commandant + rôles faibles de la decklist + popularité Commander Scryfall.
 - Les suggestions indiquent si la carte est déjà possédée dans le bulk et peuvent être ajoutées en un clic dans un deck en construction.
 - Les suggestions sont heuristiques et explicables ; elles n'utilisent pas d'API EDHREC privée/non officielle.
+
+## Tokens liés au deck
+
+Le dock d'analyse contient désormais un panneau **Tokens** pour Commander et Standard.
+
+- Détection à la demande afin de ne pas surcharger Scryfall.
+- Les cartes du deck sont résolues via `/cards/collection` par lots de 75 maximum.
+- Les relations officielles `all_parts` de Scryfall sont utilisées pour trouver tokens et emblèmes.
+- Plusieurs impressions du même token sont regroupées par identité de règles (ex. Treasure).
+- Les tokens copie / variables sont signalés même lorsqu'aucune carte token précise n'existe.
+- Les sources du deck (commandant, mainboard, sideboard) sont affichées pour chaque token.
+- Le maybeboard n'est volontairement pas inclus dans la liste des tokens à préparer.
+- La réponse est conservée en cache serveur pendant 6 h pour limiter les appels Scryfall.

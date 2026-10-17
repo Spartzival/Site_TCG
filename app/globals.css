@@ -4137,6 +4137,7 @@ a {
 .mtg-analysis-drawer__content > .mtg-analysis-grid,
 .mtg-analysis-drawer__content > .mtg-combo-panel,
 .mtg-analysis-drawer__content > .mtg-recommendations-panel,
+.mtg-analysis-drawer__content > .mtg-token-panel,
 .mtg-analysis-drawer__content > .mtg-bracket-panel {
   margin: 0;
 }
@@ -6124,4 +6125,579 @@ a {
   .mtg-deck-import__actions {
     padding-block: 10px;
   }
+}
+
+/* ================================================================
+   MTG — DECK TOKENS / EMBLEMS
+   ================================================================ */
+
+.mtg-analysis-launch-card.is-token .mtg-analysis-launch-card__symbol {
+  color: #7fd7c4;
+  border-color: rgba(127, 215, 196, 0.18);
+  background: linear-gradient(135deg, rgba(65, 157, 138, 0.13), rgba(85, 77, 151, 0.08));
+}
+
+.mtg-token-panel {
+  min-width: 0;
+  display: grid;
+  gap: 22px;
+}
+
+.mtg-token-panel__hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  padding: 20px;
+  border: 1px solid rgba(126, 211, 193, 0.14);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(70, 154, 137, 0.1), transparent 36%),
+    rgba(255, 255, 255, 0.02);
+}
+
+.mtg-token-panel__hero > div:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+}
+
+.mtg-token-panel__hero > div:first-child > span {
+  color: #74cdb9;
+  font-size: 8px;
+  letter-spacing: 0.16em;
+}
+
+.mtg-token-panel__hero h3 {
+  margin: 0;
+  color: #f2eadb;
+  font-size: clamp(21px, 3vw, 30px);
+  font-weight: 450;
+  letter-spacing: -0.03em;
+}
+
+.mtg-token-panel__hero p {
+  max-width: 620px;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.mtg-token-panel__actions {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.mtg-token-panel__section {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.mtg-token-panel__section-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 0 3px;
+}
+
+.mtg-token-panel__section-title strong {
+  color: rgba(248, 241, 228, 0.78);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+}
+
+.mtg-token-panel__section-title span {
+  min-width: 25px;
+  height: 25px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.44);
+  font-size: 9px;
+}
+
+.mtg-token-grid {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.mtg-token-card {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 116px minmax(0, 1fr);
+  gap: 14px;
+  padding: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 17px;
+  background: rgba(255, 255, 255, 0.022);
+  transition: border-color 180ms ease, transform 180ms ease, background 180ms ease;
+}
+
+.mtg-token-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(122, 207, 188, 0.22);
+  background: rgba(122, 207, 188, 0.035);
+}
+
+.mtg-token-card__visual {
+  appearance: none;
+  width: 116px;
+  min-height: 162px;
+  align-self: start;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: #17120f;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+}
+
+.mtg-token-card__visual img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.mtg-token-card__placeholder {
+  width: 100%;
+  min-height: 162px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  padding: 14px;
+  background:
+    radial-gradient(circle at 50% 35%, rgba(111, 204, 182, 0.12), transparent 35%),
+    linear-gradient(145deg, rgba(88, 72, 114, 0.14), rgba(37, 31, 27, 0.98));
+  color: rgba(255, 255, 255, 0.55);
+  text-align: center;
+}
+
+.mtg-token-card__placeholder b {
+  color: #81d3c0;
+  font-family: Georgia, serif;
+  font-size: 20px;
+  letter-spacing: 0.12em;
+}
+
+.mtg-token-card__placeholder small {
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.mtg-token-card__body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 2px 0;
+}
+
+.mtg-token-card__heading {
+  min-width: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.mtg-token-card__heading button {
+  min-width: 0;
+  appearance: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #f1e7d5;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: left;
+}
+
+.mtg-token-card__heading button:hover {
+  color: #8cd9c7;
+}
+
+.mtg-token-card__heading > span,
+.mtg-token-preview__kind {
+  flex: 0 0 auto;
+  padding: 4px 7px;
+  border: 1px solid rgba(126, 211, 193, 0.16);
+  border-radius: 999px;
+  background: rgba(126, 211, 193, 0.055);
+  color: #82d3c1;
+  font-size: 7px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.mtg-token-card__heading > span.is-emblem,
+.mtg-token-preview__kind.is-emblem {
+  border-color: rgba(202, 164, 231, 0.18);
+  background: rgba(202, 164, 231, 0.06);
+  color: #cba8e1;
+}
+
+.mtg-token-card__heading > span.is-copy,
+.mtg-token-card__heading > span.is-variable,
+.mtg-token-preview__kind.is-copy,
+.mtg-token-preview__kind.is-variable {
+  border-color: rgba(221, 180, 108, 0.18);
+  background: rgba(221, 180, 108, 0.06);
+  color: #ddb56f;
+}
+
+.mtg-token-card__body > p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.mtg-token-card__sources {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 6px;
+}
+
+.mtg-token-card__sources > small {
+  color: rgba(255, 255, 255, 0.24);
+  font-size: 7px;
+  letter-spacing: 0.12em;
+}
+
+.mtg-token-card__sources > span {
+  min-width: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.mtg-token-card__sources b {
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 8px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mtg-token-card__sources em {
+  flex: 0 0 auto;
+  color: rgba(255, 255, 255, 0.27);
+  font-size: 7px;
+  font-style: normal;
+}
+
+.mtg-token-panel__loading,
+.mtg-token-panel__empty {
+  min-height: 260px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  padding: 32px;
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.018);
+  text-align: center;
+}
+
+.mtg-token-panel__loading {
+  flex-direction: row;
+  text-align: left;
+}
+
+.mtg-token-panel__loading > div {
+  display: grid;
+  gap: 4px;
+}
+
+.mtg-token-panel__loading strong,
+.mtg-token-panel__empty strong {
+  color: rgba(248, 241, 228, 0.82);
+  font-size: 14px;
+}
+
+.mtg-token-panel__loading p,
+.mtg-token-panel__empty p {
+  max-width: 480px;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.mtg-token-panel__empty > span {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(126, 211, 193, 0.14);
+  border-radius: 17px;
+  color: #7acdb9;
+  font-family: Georgia, serif;
+  font-size: 13px;
+}
+
+.mtg-token-panel__spinner {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border: 2px solid rgba(255, 255, 255, 0.08);
+  border-top-color: #79cbb8;
+  border-radius: 50%;
+  animation: mtg-token-spin 780ms linear infinite;
+}
+
+@keyframes mtg-token-spin {
+  to { transform: rotate(360deg); }
+}
+
+.mtg-token-preview-backdrop {
+  position: fixed;
+  z-index: 420;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(2, 2, 2, 0.78);
+  backdrop-filter: blur(12px);
+  animation: mtg-analysis-backdrop-in 160ms ease both;
+}
+
+.mtg-token-preview {
+  position: relative;
+  width: min(820px, 96vw);
+  max-height: min(760px, 92dvh);
+  display: grid;
+  grid-template-columns: minmax(250px, 330px) minmax(0, 1fr);
+  gap: 28px;
+  overflow: auto;
+  padding: 26px;
+  border: 1px solid rgba(128, 208, 190, 0.18);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(85, 154, 139, 0.1), transparent 34%),
+    #0f0c0a;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.52);
+}
+
+.mtg-token-preview__close {
+  position: absolute;
+  z-index: 2;
+  top: 14px;
+  right: 14px;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  background: rgba(11, 9, 8, 0.86);
+  color: rgba(255, 255, 255, 0.72);
+  cursor: pointer;
+  font-size: 22px;
+}
+
+.mtg-token-preview__visual {
+  min-width: 0;
+  align-self: start;
+}
+
+.mtg-token-preview__visual > img,
+.mtg-token-preview__visual > .mtg-token-card__placeholder {
+  width: 100%;
+  min-height: 350px;
+  display: block;
+  overflow: hidden;
+  border-radius: 16px;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.36);
+}
+
+.mtg-token-card__placeholder.is-large {
+  display: grid;
+}
+
+.mtg-token-preview__content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 8px 8px 0;
+}
+
+.mtg-token-preview__content h3 {
+  margin: 4px 0 0;
+  color: #f5ecda;
+  font-size: clamp(26px, 4vw, 38px);
+  font-weight: 450;
+  letter-spacing: -0.04em;
+}
+
+.mtg-token-preview__type,
+.mtg-token-preview__oracle {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.mtg-token-preview__oracle {
+  padding: 12px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.mtg-token-preview__stat {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.mtg-token-preview__stat span,
+.mtg-token-preview__sources > span {
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 8px;
+  letter-spacing: 0.12em;
+}
+
+.mtg-token-preview__stat strong {
+  color: #eee3d1;
+  font-size: 11px;
+}
+
+.mtg-token-preview__sources {
+  width: 100%;
+  display: grid;
+  gap: 7px;
+  margin-top: 4px;
+}
+
+.mtg-token-preview__sources > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.mtg-token-preview__sources strong {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.mtg-token-preview__sources small,
+.mtg-token-preview__set {
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 8px;
+}
+
+@media (max-width: 1150px) {
+  .mtg-deck-analysis-dock {
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .mtg-token-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mtg-token-panel__hero {
+    flex-direction: column;
+  }
+
+  .mtg-token-panel__actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .mtg-token-preview {
+    grid-template-columns: 1fr;
+    width: min(520px, 96vw);
+    padding: 18px;
+  }
+
+  .mtg-token-preview__visual {
+    width: min(320px, 82vw);
+    margin: 0 auto;
+  }
+}
+
+@media (max-width: 460px) {
+  .mtg-token-card {
+    grid-template-columns: 92px minmax(0, 1fr);
+    gap: 10px;
+    padding: 9px;
+  }
+
+  .mtg-token-card__visual {
+    width: 92px;
+    min-height: 128px;
+  }
+
+  .mtg-token-card__placeholder {
+    min-height: 128px;
+  }
+
+  .mtg-token-panel__hero {
+    padding: 15px;
+  }
+
+  .mtg-token-preview-backdrop {
+    padding: 0;
+    align-items: end;
+  }
+
+  .mtg-token-preview {
+    width: 100vw;
+    max-height: 94dvh;
+    border-radius: 20px 20px 0 0;
+  }
+}
+
+.mtg-token-preview__faces {
+  display: grid;
+  gap: 12px;
+}
+
+.mtg-token-preview__faces img {
+  width: 100%;
+  display: block;
+  border-radius: 16px;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.36);
 }

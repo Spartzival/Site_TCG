@@ -65,3 +65,6 @@ Pour une base Supabase existante, exécuter `supabase/social_migration.sql` avan
 Le nouvel onglet **Découvrir** s’adapte au format sélectionné : tendances Commander + recommandations basées sur le commandant, ou sorties légales Standard + recommandations basées sur les couleurs jouées et les rôles manquants.
 
 Le menu compte est désormais compact et fixé sur le côté de l’écran afin de ne plus masquer le contenu.
+
+### Tokens de deck
+Chaque deck possède maintenant un panneau **Tokens** dans son dock d'analyse. Il regroupe les jetons et emblèmes officiels associés aux cartes du deck, affiche leurs images Scryfall, les cartes qui les génèrent, et permet de copier une liste des tokens à prévoir.
