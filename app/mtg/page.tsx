@@ -1,5 +1,5 @@
-import MtgDashboard from "@/components/mtg/MtgDashboard";
+import MtgModeHub from "@/components/mtg/MtgModeHub";
 
 export default function MtgPage() {
-  return <MtgDashboard />;
+  return <MtgModeHub />;
 }

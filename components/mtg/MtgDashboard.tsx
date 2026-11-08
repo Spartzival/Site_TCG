@@ -75,9 +75,9 @@ function MtgDashboardContent() {
 
       <header className="mtg-dashboard__header">
         <div className="mtg-dashboard__topbar">
-          <Link href="/" className="mtg-dashboard__back">
+          <Link href="/mtg" className="mtg-dashboard__back">
             <span>←</span>
-            Projets
+            Magic
           </Link>
 
           <div className="mtg-dashboard__game-label">

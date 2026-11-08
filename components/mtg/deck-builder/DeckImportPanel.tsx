@@ -1,20 +1,50 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { parseDeckText } from "@/lib/mtg/deck-parser";
 import type { DeckCardEntry, DeckFormat } from "@/types/mtg";
 import { resolveCardCollection } from "@/lib/mtg/api-client";
 import {
+  cardNameAliases,
   indexCardsByNameAliases,
   normalizeCardLookupName,
 } from "@/lib/mtg/card-identity";
 
 type Props = {
   format: DeckFormat;
+  currentCards: DeckCardEntry[];
+  currentCommanders?: DeckCardEntry[];
   onImport: (entries: DeckCardEntry[], commanders: DeckCardEntry[]) => void;
 };
 
-export default function DeckImportPanel({ format, onImport }: Props) {
+type ExistingPreview = {
+  key: string;
+  name: string;
+  importedQuantity: number;
+  currentQuantity: number;
+  importedSection: DeckCardEntry["section"];
+  currentSection: DeckCardEntry["section"];
+};
+
+function sectionLabel(section: DeckCardEntry["section"]) {
+  switch (section) {
+    case "commander":
+      return "Commandant";
+    case "sideboard":
+      return "Sideboard";
+    case "maybeboard":
+      return "Maybeboard";
+    default:
+      return "Deck principal";
+  }
+}
+
+export default function DeckImportPanel({
+  format,
+  currentCards,
+  currentCommanders = [],
+  onImport,
+}: Props) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
@@ -32,6 +62,58 @@ export default function DeckImportPanel({ format, onImport }: Props) {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open, loading]);
+
+  const parsedPreview = useMemo(() => parseDeckText(text), [text]);
+
+  const existingPreview = useMemo<ExistingPreview[]>(() => {
+    if (!parsedPreview.entries.length) return [];
+
+    const currentEntries = [...currentCommanders, ...currentCards];
+    const aliasMap = new Map<string, DeckCardEntry[]>();
+
+    for (const entry of currentEntries) {
+      for (const alias of cardNameAliases(entry.card)) {
+        const list = aliasMap.get(alias) ?? [];
+        list.push(entry);
+        aliasMap.set(alias, list);
+      }
+    }
+
+    const aggregated = new Map<string, ExistingPreview>();
+
+    for (const parsedEntry of parsedPreview.entries) {
+      const importedSection: DeckCardEntry["section"] =
+        format === "Standard" && parsedEntry.section === "commander"
+          ? "mainboard"
+          : parsedEntry.section;
+
+      const matches = aliasMap.get(normalizeCardLookupName(parsedEntry.name)) ?? [];
+      if (!matches.length) continue;
+
+      // A same-section match is the one that will actually merge on import.
+      // If there is none, still show the existing copy in another zone so the
+      // user knows the logical card is already somewhere in the deck.
+      const preferredMatches = matches.some((entry) => entry.section === importedSection)
+        ? matches.filter((entry) => entry.section === importedSection)
+        : matches;
+
+      for (const current of preferredMatches) {
+        const key = `${normalizeCardLookupName(current.card.name)}:${importedSection}:${current.section}`;
+        const previous = aggregated.get(key);
+
+        aggregated.set(key, {
+          key,
+          name: current.card.name,
+          importedQuantity: (previous?.importedQuantity ?? 0) + parsedEntry.quantity,
+          currentQuantity: current.quantity,
+          importedSection,
+          currentSection: current.section,
+        });
+      }
+    }
+
+    return Array.from(aggregated.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [currentCards, currentCommanders, format, parsedPreview.entries]);
 
   const close = () => {
     if (loading) return;
@@ -137,9 +219,7 @@ export default function DeckImportPanel({ format, onImport }: Props) {
             <div className="mtg-deck-import__header">
               <div>
                 <span>DECKLIST IMPORT</span>
-                <h3 id="mtg-deck-import-title">
-                  Importer une liste {format}
-                </h3>
+                <h3 id="mtg-deck-import-title">Importer une liste {format}</h3>
               </div>
 
               <button
@@ -164,7 +244,10 @@ export default function DeckImportPanel({ format, onImport }: Props) {
                       ? `// Commander\n1 Kona, Rescue Beastie\n\n// Main\n1 Sol Ring\n1 Llanowar Elves\n...`
                       : `// Main\n4 Llanowar Elves\n4 Lightning Strike\n24 Forest\n...\n\n// Sideboard\n2 Duress\n...`
                   }
-                  onChange={(event) => setText(event.target.value)}
+                  onChange={(event) => {
+                    setText(event.target.value);
+                    setMessage(null);
+                  }}
                 />
               </label>
 
@@ -177,6 +260,69 @@ export default function DeckImportPanel({ format, onImport }: Props) {
                   sont présentes dans la liste.
                 </small>
               </div>
+
+              {text.trim() && (
+                <div className="mtg-deck-import__preview-summary">
+                  <div>
+                    <span>Lignes détectées</span>
+                    <strong>{parsedPreview.entries.length}</strong>
+                  </div>
+                  <div className={existingPreview.length ? "has-existing" : ""}>
+                    <span>Déjà présentes</span>
+                    <strong>{existingPreview.length}</strong>
+                  </div>
+                  <div>
+                    <span>Lignes ignorées</span>
+                    <strong>{parsedPreview.ignored.length}</strong>
+                  </div>
+                </div>
+              )}
+
+              {existingPreview.length > 0 && (
+                <section className="mtg-deck-import__existing">
+                  <div className="mtg-deck-import__existing-heading">
+                    <div>
+                      <span>DÉJÀ PRÉSENTES DANS CE DECK</span>
+                      <strong>
+                        Ces cartes seront fusionnées avec les exemplaires existants.
+                      </strong>
+                    </div>
+                    <span>{existingPreview.length}</span>
+                  </div>
+
+                  <div className="mtg-deck-import__existing-list">
+                    {existingPreview.map((existing) => {
+                      const sameSection = existing.currentSection === existing.importedSection;
+                      return (
+                        <div key={existing.key} className="mtg-deck-import__existing-row">
+                          <div>
+                            <strong>{existing.name}</strong>
+                            <small>
+                              {sectionLabel(existing.currentSection)}
+                              {!sameSection
+                                ? ` · import prévu dans ${sectionLabel(existing.importedSection)}`
+                                : ""}
+                            </small>
+                          </div>
+
+                          <div className="mtg-deck-import__existing-quantity">
+                            <span>Actuel</span>
+                            <strong>{existing.currentQuantity}</strong>
+                            <span>+</span>
+                            <strong className="is-incoming">{existing.importedQuantity}</strong>
+                            {sameSection && (
+                              <>
+                                <span>=</span>
+                                <strong>{existing.currentQuantity + existing.importedQuantity}</strong>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
 
               {message && <p className="mtg-deck-import__message">{message}</p>}
             </div>

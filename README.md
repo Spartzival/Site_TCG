@@ -68,3 +68,13 @@ Le menu compte est désormais compact et fixé sur le côté de l’écran afin 
 
 ### Tokens de deck
 Chaque deck possède maintenant un panneau **Tokens** dans son dock d'analyse. Il regroupe les jetons et emblèmes officiels associés aux cartes du deck, affiche leurs images Scryfall, les cartes qui les génèrent, et permet de copier une liste des tokens à prévoir.
+
+
+## Magic Play prototype
+
+La route `/mtg` sert maintenant de hub Magic :
+
+- **Construction de deck** → `/mtg/decks`
+- **Jeu** → `/mtg/play`
+
+Le mode Jeu contient une première table interactive locale et une synchronisation prototype via Supabase Realtime. Voir `PLAY_NOTES.md`.

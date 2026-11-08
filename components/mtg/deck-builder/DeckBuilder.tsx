@@ -733,6 +733,35 @@ export default function DeckBuilder({
     onChange({ ...deck, ...patch, updatedAt: new Date().toISOString() });
   };
 
+  const clearDeck = () => {
+    const hasContent = deck.cards.length > 0 || deck.commanders.length > 0;
+    if (!hasContent) return;
+
+    const confirmed = window.confirm(
+      isCommander
+        ? `Vider entièrement « ${deck.name} » ? Le commandant, le deck principal, le sideboard et le maybeboard seront retirés.`
+        : `Vider entièrement « ${deck.name} » ? Le deck principal, le sideboard et le maybeboard seront retirés.`,
+    );
+
+    if (!confirmed) return;
+
+    setSelectedEntryKey(null);
+    setDeckDimension(null);
+    setDeckFolderId(null);
+    setDeckSearch("");
+    setDeckSortBy("name");
+    setAnalysisDrawer(null);
+    setRemote(null);
+    setRecommendations(null);
+    setTokens(null);
+    setTokensLoadedSignature("");
+
+    update({
+      cards: [],
+      commanders: [],
+    });
+  };
+
   const copyDecklist = async () => {
     try {
       await copyTextToClipboard(exportDeckNames(deck));
@@ -1176,6 +1205,8 @@ export default function DeckBuilder({
               )}
               <DeckImportPanel
                 format={format}
+                currentCards={deck.cards}
+                currentCommanders={deck.commanders}
                 onImport={(entries, commanders) =>
                   update({
                     cards: mergeEntries(
@@ -1196,6 +1227,16 @@ export default function DeckBuilder({
                   })
                 }
               />
+
+              <button
+                type="button"
+                className="mtg-deck-clear-button"
+                onClick={clearDeck}
+                disabled={deck.cards.length === 0 && deck.commanders.length === 0}
+                title="Retirer toutes les cartes de ce deck sans supprimer le deck"
+              >
+                Vider le deck
+              </button>
             </div>
           )}
 
