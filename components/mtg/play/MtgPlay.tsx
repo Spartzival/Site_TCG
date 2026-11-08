@@ -242,7 +242,7 @@ export default function MtgPlay() {
     });
 
     channel
-      .on("broadcast", { event: "player-state" }, ({ payload }) => {
+      .on("broadcast", { event: "player-state" }, ({ payload }: { payload: unknown }) => {
         const next = payload as PublicPlayerState;
         if (!next?.playerId) return;
         setRemotePlayers((current) => ({ ...current, [next.playerId]: next }));
@@ -256,7 +256,7 @@ export default function MtgPlay() {
           payload: toPublicPlayerState(current),
         });
       })
-      .on("presence", { event: "leave" }, ({ key }) => {
+      .on("presence", { event: "leave" }, ({ key }: { key: string }) => {
         setRemotePlayers((current) => {
           const next = { ...current };
           delete next[key];
@@ -264,7 +264,7 @@ export default function MtgPlay() {
         });
       });
 
-    channel.subscribe(async (subscriptionStatus) => {
+    channel.subscribe(async (subscriptionStatus: string) => {
       if (subscriptionStatus === "SUBSCRIBED") {
         channelRef.current = channel;
         setStatus("Connecté");
